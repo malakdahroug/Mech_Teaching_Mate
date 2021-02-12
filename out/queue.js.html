@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="utf-8">
-    <title>JSDoc: Source: stack.js</title>
+    <title>JSDoc: Source: queue.js</title>
 
     <script src="scripts/prettify/prettify.js"> </script>
     <script src="scripts/prettify/lang-css.js"> </script>
@@ -17,7 +17,7 @@
 
 <div id="main">
 
-    <h1 class="page-title">Source: stack.js</h1>
+    <h1 class="page-title">Source: queue.js</h1>
 
     
 
@@ -27,64 +27,63 @@
     <section>
         <article>
             <pre class="prettyprint source linenums"><code>/**
- * Stack class that operates in FILO model -> first to come will be the last to leave
+ * Queue class that operates in FIFO model -> first to come will be the first to leave
  */
-class Stack {
+class Queue {
     /**
      * Default constructor that will be called when the class is instantiated.
-     * It initializes and empty array containing the Stack
+     * It initializes and empty array containing the Queue
      */
     constructor() {
-        this.stack = [];
+        this.queue = [];
     }
 
     /**
-     * Push function that adds an element to the stack
+     * Enqueue function that adds an element to the end of the queue
      *
-     * @param element element to be pushed to the stack
+     * @param element to be pushed to the queue
      */
-    push(element) {
-        this.stack.push(element);
+    enqueue(element) {
+        this.queue.push(element);
     }
 
     /**
-     * Pop function that removes an element from the end of the stack, if stack is empty it will return -1
+     * Dequeue function that removes the first element from the Queue and returns it. If the queue is empty -1 will be returned
      *
-     * @returns {number|*} element removed from the stack or -1 if stack is empty
+     * @returns {number|*} element removed or -1 if Queue is empty
      */
-    pop() {
+    dequeue() {
         if(!this.isEmpty()) {
-            return this.stack.pop();
-        } else {
-            return -1;
-        }
-    }
-
-
-    /**
-     * Top function that returns the last element from the stack or -1 if stack is empty
-     *
-     * @returns {number|*} last element in the stack or -1 if the stack is empty
-     */
-    top() {
-        if(!this.isEmpty()) {
-            return this.stack[this.stack.length - 1];
+            return this.queue.splice(0, 1)[0];
         } else {
             return -1;
         }
     }
 
     /**
-     * isEmpty function that returns true if stack is empty, if it has elements it will return false
+     * Front function returns the first element of the Queue
      *
-     * @returns {boolean} containing state of the stack
+     * @returns {number|*} first element in the queue
+     */
+    front() {
+        if(!this.isEmpty()) {
+            return this.queue[0];
+        } else {
+            return -1;
+        }
+    }
+
+    /**
+     * isEmpty function that returns true if Queue is empty, if it has elements it will return false
+     *
+     * @returns {boolean} containing state of the Queue
      */
     isEmpty() {
-        return this.stack.length === 0;
+        return this.queue.length === 0;
     }
 }
 
-module.exports = Stack
+module.exports = Queue
 </code></pre>
         </article>
     </section>
