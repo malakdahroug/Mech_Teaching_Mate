@@ -7,3 +7,12 @@ function generate() {
             document.getElementById('code').innerHTML = '\n' + response;
         });
 }
+
+function validateSequence() {
+    document.getElementById('code').innerHTML = 'Validating...';
+    fetch('http://localhost:3000/sequence/isValid/' + document.getElementById('sequence').value)
+        .then(o => o.text())
+        .then(response => {
+            document.getElementById('code').innerHTML = '\n' + response;
+        });
+}

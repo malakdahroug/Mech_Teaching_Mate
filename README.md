@@ -15,9 +15,10 @@ If all the dependencies are installed run the following in the terminal / comman
 `npm install`  
 `node index.js`
 
+#### Sequence generation
 Navigate to http://localhost:3000/generateSequence/A+,A-,B+,B- to test the application. You are more than welcome to try
 different sequences, but currently (as of version 1.0.0) the program is only capable of mocking up code for generating
-serial sequences. 
+serial sequences only. 
 
 E.g. A+, B+, C+, D+, D-, B-, C-, A- will be a correct sequence to generate.
 
@@ -32,10 +33,16 @@ Examples of URLs to test sequence validation:
 - http://localhost:3000/generateSequence/A+,B+,C+,D+,D-,B-,C-,A-,A+,B+,Ca,D+,D-,B-,C-,A- (invalid)
 - http://localhost:3000/generateSequence/A3,B+,A-,B- (invalid)
 
+#### Sequence validation
+Application is capable of validating various sequences (concurrent, serial, repeating, timed) as of version 1.0.2. Validation can be done
+by calling the backend on the following URL: http://localhost:3000/sequence/isValid/SEQUENCE
+
+SEQUENCE have to be substituted by the actual sequence to validate. Set of tests will be added to the validation function
+in the next release.
 
 ## Current release
 ##### Backend
-Current version 1.0.1  
+Current version 1.0.2  
 
 ##### Frontend
 Current version 1.0.0
@@ -45,11 +52,11 @@ Not available yet.
 
 ## Roadmap
 ### Backend
-- **Stage 1 - Simple sequences - CURRENT v. 1.0.1**
+- **Stage 1 - Simple sequences - CURRENT v. 1.0.2**
     - Break the sequence down - *v. 1.0.0*
     - Implement simple code generation - *v. 1.0.1*
-    - Detect type of sequence(simple, concurrent, repetitive or timed) - **CURRENT v. 1.0.1**
-    - Validate the sequence using regular expressions<sup>1</sup>
+    - Detect type of sequence(simple, concurrent, repetitive or timed) - **v. 1.0.1**
+    - Validate the sequence using regular expressions<sup>1</sup> - **CURRENT v. 1.0.2**
 - **Stage 2 - User sessions & projects**
     - Implement registration & login system that will be using database to store user data e.g. user projects
     - Create routes and backend procedures for the following:
@@ -126,6 +133,12 @@ Not available yet.
     - OPTIONAL: Implement own comm stack if it can address issues discovered in Communication Stack - Stage 1 (if there should be any)
 
 ## Changelog
+### Version 1.0.2
+- Added sequence validation - the function created in [backend/index.js](/frontend/validate.html) returns an empty array if there are no errors in the sequence, if there are any errors it will return an array containing the list of errors
+- Added a new backend route that allows to validate the sequence provided as a GET parameter http://localhost:3000/sequence/isValid/(Sequence).
+- Added a frontend page [frontend/validate.html](/frontend/validate.html) which allows to validate the given sequence
+- Sequences that can be validated are concurrent, repeating, simple and timed sequences
+
 ### Version 1.0.1
 - Added code generation (actual attempt to generate SCL code). Program will try to generate code based on the given simple sequence (just includes actuations + and -, without timers, counters or concurrency) - for any other sequence it will result in an error.
 - Modified the way sequence is converted to the code - now it adds each code line to two separate arrays that later on are joined together using HTML line break tags.

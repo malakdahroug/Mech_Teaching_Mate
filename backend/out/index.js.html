@@ -68,6 +68,179 @@ app.get('/generateSequence/:sequence/:sensorsPresent', function(req, res){
     }
 });
 
+
+app.get('/sequence/isValid/:sequence', function(req, res){
+    // Temporary Cross Origin workaround
+    res.header("Access-Control-Allow-Origin", "*");
+
+    let sequence = req.params.sequence.toUpperCase().split(',');
+
+    const sequenceValidator = isValid(sequence);
+
+    if(sequenceValidator.length === 0) {
+        res.send('The sequence provided is valid!');
+    } else {
+        let response = 'The sequence contains the following errors:\n'
+        for(const element of sequenceValidator) {
+            response += '- ' + element + '\n';
+        }
+        res.send(response);
+    }
+});
+
+/**
+ * Function that validates if the sequence provided is correct. If there are any errors they will be returned as an array
+ * If there are no errors an empty array will be returned.
+ *
+ * @param sequence an array of elements containing the next instructions
+ * @returns {array} an empty array if sequence is valid, an array with parts that contain errors if it's invalid
+ */
+function isValid(sequence) {
+    // An array containing indexes of opening brackets
+    let openingBrackets = [];
+
+    // An array containing indexes of opening square brackets
+    let openingRepeating = [];
+
+    // An array containing indexes of closing brackets
+    let closingBrackets = [];
+
+
+    // An array containing indexes of closings for repeating sequence
+    let closingRepeating = [];
+
+    // A set containing errors in the sequence
+    let errorSet = new Set([]);
+
+    // Regular expression to validate each action in the sequence
+    // It can either be:
+    // - A single letter followed by +
+    // - A single letter followed by +
+    // - T followed by any integer greater than 1 followed by S
+    let regex = /^([A-Z]\+)|([A-Z]-)|T[1-9]+[0-9]*S$/;
+
+    // Iterates through the sequence array and find opening and closing brackets
+    // Pushes indexes of opening and closing brackets to the openingBrackets array and closingBrackets array
+    for(let i = 0; i &lt; sequence.length; i++) {
+
+        // Store current action of the sequence in temp variable - it is because action will be modified to validate against regex
+        let temp = sequence[i];
+
+        // Get index of opening bracket in the current action of the sequence
+        let opening = sequence[i].search(/\(/);
+        let openingSquare = sequence[i].search(/\[/);
+
+        // Get index of closing bracket in the current action of the sequence
+        let closing = sequence[i].search(/\)/);
+        let closingSquare = sequence[i].search(/\]\^([2-9]|[1-9]+[0-9]+)/);
+
+
+        // If opening bracket was found in the current element it pushes its index to the openingBrackets array
+        // It then removes it from the temp variable (current action)
+        if(opening !== -1) {
+            openingBrackets.push(i);
+            temp = temp.replace(/\(/, '');
+        }
+
+        // If opening square bracket was found in the current element it pushes its index to the openingRepeating array
+        // It then removes it from the temp variable (current action)
+        if(openingSquare !== -1) {
+            openingRepeating.push(i);
+            temp = temp.replace(/\[/, '');
+        }
+
+        // If closing bracket was found in the current element it pushes its index to the closingBrackets array
+        // It then removes it from the temp variable (current action)
+        if(closing !== -1) {
+            closingBrackets.push(i);
+            temp = temp.replace(/\)/, '');
+        }
+
+        // If closing of the repeating sequence was found in the current element it pushes its index to the closingRepeating array
+        // It then removes it from the temp variable (current action)
+        if(closingSquare !== -1) {
+            closingRepeating.push(i);
+            temp = temp.replace(/\]\^([2-9]|[1-9]+[0-9]+)/, '');
+        }
+
+        // Tries to match a string to the regular expression provided
+        const match = temp.match(regex);
+
+        // Checks if match exists and if the string provided equals to the match returned
+        // If it doesn't then the current element will be added to the error set
+        if(match &amp;&amp; !(temp === match[0])) {
+            errorSet.add(sequence[i]);
+        }
+    }
+
+    // If the amount of closing and opening brackets is the same, carry on with validating the sequence
+    // else return an error informing user if there are too many / not enough closing brackets
+    if(openingBrackets.length === closingBrackets.length) {
+        // Iterate through both opening and closing brackets arrays
+        for(let i = 0; i &lt; openingBrackets.length; i++) {
+            // Check if the opening bracket is after the closing bracket
+            // If it is add it to the error set
+            if(openingBrackets[i] >= closingBrackets[i]) {
+                errorSet.add(sequence[openingBrackets[i]]);
+                errorSet.add(sequence[closingBrackets[i]]);
+            // Check if it is not last element of openingBrackets
+            // If it is not, check if the closing bracket is before the next opening bracket
+            // If it is not, add it to the error set
+            } else if(i !== openingBrackets.length - 1) {
+                if(closingBrackets[i] >= openingBrackets[i + 1]) {
+                    errorSet.add(sequence[closingBrackets[i]]);
+                    errorSet.add(sequence[openingBrackets[i + 1]]);
+                }
+            }
+        }
+    }
+
+    // If the amount of closing and opening brackets for repeating sequence is the same, carry on with validating the sequence
+    // else return an error informing user if there are too many / not enough closing square brackets
+    if(openingRepeating.length === closingRepeating.length) {
+        // Iterate through both opening and closing brackets arrays for repeating sequence
+        for(let i = 0; i &lt; openingRepeating.length; i++) {
+            // Check if the opening square bracket is after the closing bracket of the repeating sequence
+            // If it is add it to the error set
+            if(openingRepeating[i] >= closingRepeating[i]) {
+                errorSet.add(sequence[openingRepeating[i]]);
+                errorSet.add(sequence[closingRepeating[i]]);
+            // Check if it is not last element of openingRepeating
+            // If it is not, check if the closing of the repeating sequence is before the next opening square bracket
+            // If it is not, add it to the error set
+            } else if(i !== openingRepeating.length - 1) {
+                if(closingRepeating[i] >= openingRepeating[i + 1]) {
+                    errorSet.add(sequence[closingRepeating[i]]);
+                    errorSet.add(sequence[openingRepeating[i + 1]]);
+                }
+            }
+        }
+    }
+
+    // If there are more closing brackets than opening ones, return an error informing user that
+    // there are too many closing brackets
+    // Otherwise, return an error that one or more of the opening brackets were not closed
+    if(openingRepeating.length &lt; closingRepeating.length) {
+        errorSet.add("There are one or more closing bracket for repeating sequence that are missing an opening square bracket");
+    } else if(openingRepeating.length > closingRepeating.length) {
+        errorSet.add("There is a syntax error in the repeating sequence, it is either missing a closing bracket or no number of repetitions was provided!");
+    }
+
+    // If there are more closing brackets than opening ones, return an error informing user that
+    // there are too many closing brackets
+    // Otherwise, return an error that one or more of the opening brackets were not closed
+    if(openingBrackets.length &lt; closingBrackets.length) {
+        errorSet.add("There are one or more closing round bracket that are missing an opening round bracket");
+    } else if(openingBrackets.length > closingBrackets.length) {
+        errorSet.add("One or more of the opening round brackets are not closed!");
+    }
+
+
+
+    // Return all the errors in array form or empty array if there are no errors present
+    return Array.from(errorSet);
+}
+
 /**
  * Function responsible for generating PLC code
  *
@@ -204,13 +377,13 @@ app.listen(3000);
 </div>
 
 <nav>
-    <h2><a href="index.html">Home</a></h2><h3>Classes</h3><ul><li><a href="Queue.html">Queue</a></li><li><a href="Stack.html">Stack</a></li></ul><h3>Global</h3><ul><li><a href="global.html#generateCode">generateCode</a></li></ul>
+    <h2><a href="index.html">Home</a></h2><h3>Classes</h3><ul><li><a href="Queue.html">Queue</a></li><li><a href="Stack.html">Stack</a></li></ul><h3>Global</h3><ul><li><a href="global.html#generateCode">generateCode</a></li><li><a href="global.html#isValid">isValid</a></li></ul>
 </nav>
 
 <br class="clear">
 
 <footer>
-    Documentation generated by <a href="https://github.com/jsdoc/jsdoc">JSDoc 3.6.6</a> on Mon Feb 15 2021 15:46:36 GMT+0000 (Greenwich Mean Time)
+    Documentation generated by <a href="https://github.com/jsdoc/jsdoc">JSDoc 3.6.6</a> on Sun Feb 21 2021 15:15:25 GMT+0000 (Greenwich Mean Time)
 </footer>
 
 <script> prettyPrint(); </script>
