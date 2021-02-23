@@ -20,13 +20,13 @@ app.get('/generateSequence/:sequence/:sensorsPresent', function(req, res){
     // a regular expression it will add 1 to the sequence type string, otherwise it will add 0
 
     // Regular expression that detects if sequence has multiple actuations occurring at once
-    sequenceType += ((req.params.sequence.toUpperCase().search(/\((([A-Z](\+|\-),)|(T[1-9]+[0-9]*S,))+([A-Z](\+|\-)|(T[1-9]+[0-9]*S))\)/) !== -1) ? 1 : 0);
+    sequenceType += ((req.params.sequence.toUpperCase().search(/\((([A-Z](\+|\-),)|([1-9]+[0-9]*S,))+([A-Z](\+|\-)|([1-9]+[0-9]*S))\)/) !== -1) ? 1 : 0);
 
     // Regular expression that detects if sequence has repeated actions (e.g. through a counter)
-    sequenceType += ((req.params.sequence.toUpperCase().search(/\[(([A-Z](\+|\-),)|(T[1-9]+[0-9]*S,))*([A-Z](\+|\-)\)|(T[1-9]+[0-9]*S))\]\^([2-9]|[1-9]+[0-9]+)/) !== -1) ? 1 : 0);
+    sequenceType += ((req.params.sequence.toUpperCase().search(/\[(([A-Z](\+|\-),)|([1-9]+[0-9]*S,))*([A-Z](\+|\-)\)|([1-9]+[0-9]*S))\]\^([2-9]|[1-9]+[0-9]+)/) !== -1) ? 1 : 0);
 
     // Regular expression that detects if sequence includes a timer
-    sequenceType += ((req.params.sequence.toUpperCase().search(/T[1-9]+[0-9]*S/) !== -1) ? 1 : 0);
+    sequenceType += ((req.params.sequence.toUpperCase().search(/([1-9]+[0-9]*S)/) !== -1) ? 1 : 0);
 
     console.log(sequenceType)
 
@@ -44,20 +44,27 @@ app.get('/generateSequence/:sequence/:sensorsPresent', function(req, res){
 app.get('/sequence/isValid/:sequence', function(req, res){
     // Temporary Cross Origin workaround
     res.header("Access-Control-Allow-Origin", "*");
+    res.setHeader('Content-Type', 'application/json');
 
     let sequence = req.params.sequence.toUpperCase().split(',');
 
     const sequenceValidator = isValid(sequence);
 
-    if(sequenceValidator.length === 0) {
-        res.send('The sequence provided is valid!');
-    } else {
-        let response = 'The sequence contains the following errors:\n'
-        for(const element of sequenceValidator) {
-            response += '- ' + element + '\n';
-        }
-        res.send(response);
-    }
+    // #START - For actual API responses - for testing comment
+    // if(sequenceValidator.length === 0) {
+    //     res.send('The sequence provided is valid!');
+    // } else {
+    //     let response = 'The sequence contains the following errors:\n'
+    //     for(const element of sequenceValidator) {
+    //         response += '- ' + element + '\n';
+    //     }
+    //     res.send(response);
+    // }
+    // #END - For actual API responses - for testing comment
+
+    // #START - For testing only - if not running tests - comment
+    res.send(sequenceValidator);
+    // #END - For testing only - if not running tests - comment
 });
 
 /**
@@ -88,8 +95,17 @@ function isValid(sequence) {
     // It can either be:
     // - A single letter followed by +
     // - A single letter followed by +
-    // - T followed by any integer greater than 1 followed by S
-    let regex = /^([A-Z]\+)|([A-Z]-)|T[1-9]+[0-9]*S$/;
+    // - T followed by a letter S
+    // - A number followed by a letter S
+    // - A number followed by a string BAR
+    let regex = /^([A-Z]\+)|([A-Z]-)|([0-9].[0-9]+|[1-9]+[0-9]*.[0-9]+|[0-9])S|TS|([0-9].[0-9]+|[1-9]+[0-9]*.[0-9]+|[0-9])BAR$/;
+
+    // Check if sequence starts and ends with [] it means it is a looping sequence - better way has to be found for verification
+    // It is just a temporary solution
+    if(sequence[0][0] === '[' && sequence[sequence.length - 1][sequence[sequence.length - 1].length - 1] === ']') {
+        sequence[0] = sequence[0].substring(1,sequence[0].length);
+        sequence[sequence.length - 1] = sequence[sequence.length - 1].substring(0, sequence[sequence.length - 1].length - 1);
+    }
 
     // Iterates through the sequence array and find opening and closing brackets
     // Pushes indexes of opening and closing brackets to the openingBrackets array and closingBrackets array
@@ -104,7 +120,7 @@ function isValid(sequence) {
 
         // Get index of closing bracket in the current action of the sequence
         let closing = sequence[i].search(/\)/);
-        let closingSquare = sequence[i].search(/\]\^([2-9]|[1-9]+[0-9]+)/);
+        let closingSquare = sequence[i].search(/\]\^(([1-9]+[0-9]+)|([2-9]))|(\]\^N\+[1-9]+[0-9]*)|(\]\^N)|\]/);
 
 
         // If opening bracket was found in the current element it pushes its index to the openingBrackets array
@@ -132,7 +148,7 @@ function isValid(sequence) {
         // It then removes it from the temp variable (current action)
         if(closingSquare !== -1) {
             closingRepeating.push(i);
-            temp = temp.replace(/\]\^([2-9]|[1-9]+[0-9]+)/, '');
+            temp = temp.replace(/\]\^(([1-9]+[0-9]+)|([2-9]))|(\]\^N\+[1-9]+[0-9]*)|(\]\^N)|\]/, '');
         }
 
         // Tries to match a string to the regular expression provided
@@ -141,6 +157,8 @@ function isValid(sequence) {
         // Checks if match exists and if the string provided equals to the match returned
         // If it doesn't then the current element will be added to the error set
         if(match && !(temp === match[0])) {
+            errorSet.add(sequence[i]);
+        } else if (match === null) {
             errorSet.add(sequence[i]);
         }
     }
@@ -177,6 +195,7 @@ function isValid(sequence) {
             if(openingRepeating[i] >= closingRepeating[i]) {
                 errorSet.add(sequence[openingRepeating[i]]);
                 errorSet.add(sequence[closingRepeating[i]]);
+                console.log(1);
             // Check if it is not last element of openingRepeating
             // If it is not, check if the closing of the repeating sequence is before the next opening square bracket
             // If it is not, add it to the error set
@@ -188,6 +207,7 @@ function isValid(sequence) {
             }
         }
     }
+
 
     // If there are more closing brackets than opening ones, return an error informing user that
     // there are too many closing brackets
@@ -337,5 +357,4 @@ function generateCode(sequence, q, sensors) {
     return outputCode;
 }
 
-// Defines the port backend will be served on
-app.listen(3000);
+module.exports = app

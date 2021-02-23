@@ -40,9 +40,19 @@ by calling the backend on the following URL: http://localhost:3000/sequence/isVa
 SEQUENCE have to be substituted by the actual sequence to validate. Set of tests will be added to the validation function
 in the next release.
 
+#### Automated tests
+To run automated tests on the code downloaded before 1.0.2b release additional packages are required. Please follow the steps
+below to be able to execute automated tests.
+`cd repository_location`
+`git pull origin master`
+`npm install`
+`npm run test`
+
+There are 53 tests in total (1 testing suite test, 1 endpoint test, 26 correct sequence tests and 25 incorrect sequence tests).
+
 ## Current release
 ##### Backend
-Current version 1.0.2  
+Current version 1.0.2b  
 
 ##### Frontend
 Current version 1.0.0
@@ -52,11 +62,11 @@ Not available yet.
 
 ## Roadmap
 ### Backend
-- **Stage 1 - Simple sequences - CURRENT v. 1.0.2**
+- **Stage 1 - Simple sequences - CURRENT v. 1.0.2b**
     - Break the sequence down - *v. 1.0.0*
     - Implement simple code generation - *v. 1.0.1*
     - Detect type of sequence(simple, concurrent, repetitive or timed) - **v. 1.0.1**
-    - Validate the sequence using regular expressions<sup>1</sup> - **CURRENT v. 1.0.2**
+    - Validate the sequence using regular expressions<sup>1</sup> - **CURRENT v. 1.0.2b**
 - **Stage 2 - User sessions & projects**
     - Implement registration & login system that will be using database to store user data e.g. user projects
     - Create routes and backend procedures for the following:
@@ -133,6 +143,13 @@ Not available yet.
     - OPTIONAL: Implement own comm stack if it can address issues discovered in Communication Stack - Stage 1 (if there should be any)
 
 ## Changelog
+### Version 1.0.2b - BUGFIX & TEST RELEASE
+- Added a set of automated API tests to verify correctness of the API.
+- Identified and addressed various bugs especially for looping sequences (where the whole sequence is surrounded with square brackets).
+- As a temporary solution isValid function checks if the sequence starts and ends with square brackets, if so it ignores them.
+- Added additional options for valid sequences, now timers and repeating sequences with variables will get validated correctly.
+- isValid function gets tested against 26 valid sequences and 25 invalid sequences. More sequences will be added in the next releases.
+
 ### Version 1.0.2
 - Added sequence validation - the function created in [backend/index.js](/frontend/validate.html) returns an empty array if there are no errors in the sequence, if there are any errors it will return an array containing the list of errors
 - Added a new backend route that allows to validate the sequence provided as a GET parameter http://localhost:3000/sequence/isValid/(Sequence).
