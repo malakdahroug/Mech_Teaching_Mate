@@ -43,12 +43,12 @@ in the next release.
 #### Automated tests
 To run automated tests on the code downloaded before 1.0.2b release additional packages are required. Please follow the steps
 below to be able to execute automated tests.
-`cd repository_location`
-`git pull origin master`
-`npm install`
-`npm run test`
+`cd repository_location`  
+`git pull origin master`  
+`npm install`  
+`npm run test`  
 
-There are 53 tests in total (1 testing suite test, 1 endpoint test, 26 correct sequence tests and 25 incorrect sequence tests).
+There are 51 tests in total (1 testing suite test, 1 endpoint test, 24 correct sequence tests and 25 incorrect sequence tests).
 
 ## Current release
 ##### Backend
@@ -148,7 +148,7 @@ Not available yet.
 - Identified and addressed various bugs especially for looping sequences (where the whole sequence is surrounded with square brackets).
 - As a temporary solution isValid function checks if the sequence starts and ends with square brackets, if so it ignores them.
 - Added additional options for valid sequences, now timers and repeating sequences with variables will get validated correctly.
-- isValid function gets tested against 26 valid sequences and 25 invalid sequences. More sequences will be added in the next releases.
+- isValid function gets tested against 24 valid sequences and 25 invalid sequences. More sequences will be added in the next releases.
 
 ### Version 1.0.2
 - Added sequence validation - the function created in [backend/index.js](/frontend/validate.html) returns an empty array if there are no errors in the sequence, if there are any errors it will return an array containing the list of errors
