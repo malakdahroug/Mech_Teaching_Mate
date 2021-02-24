@@ -1,0 +1,16 @@
+#correct_code {
+    float: left;
+    width: 45vw;
+    min-height: 90vh;
+}
+
+#incorrect_code {
+    float: right;
+    width: 45vw;
+    min-height: 90vh;
+    display: none;
+}
+
+#solutionButton {
+    display: none;
+}

@@ -1,10 +1,15 @@
 function generate() {
-    document.getElementById('code').innerHTML = 'Generating...';
     const checkbox = (document.getElementById('withSensors').checked ? '1' : '0');
-    fetch('http://localhost:3000/generateSequence/' + document.getElementById('sequence').value + '/' + checkbox)
-        .then(o => o.text())
+    const errors = document.getElementById('withFaults').value;
+    document.getElementById('correct_code').innerHTML = 'Generating...';
+    document.getElementById('incorrect_code').innerHTML = 'Generating...';
+    fetch('http://localhost:3000/sequence/generate/' + document.getElementById('sequence').value + '/' + checkbox + '/' + errors)
+        .then(o => o.json())
         .then(response => {
-            document.getElementById('code').innerHTML = '\n' + response;
+            document.getElementById('solutionButton').style.display = 'block';
+            document.getElementById('correct_code').innerHTML = '\n' + response.correct.toString();
+            document.getElementById('incorrect_code').innerHTML = '\n' + response.incorrect.toString();
+
         });
 }
 
@@ -15,4 +20,8 @@ function validateSequence() {
         .then(response => {
             document.getElementById('code').innerHTML = '\n' + response;
         });
+}
+
+function showSolution() {
+    document.getElementById('incorrect_code').style.display = 'block';
 }

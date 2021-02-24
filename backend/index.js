@@ -67,6 +67,46 @@ app.get('/sequence/isValid/:sequence', function(req, res){
     // #END - For testing only - if not running tests - comment
 });
 
+app.get('/sequence/generate/:sequence/:sensorsPresent/:withFaults', function(req, res){
+    // Temporary Cross Origin workaround
+    res.header("Access-Control-Allow-Origin", "*");
+
+    const sequenceQueue = new queue(); // Instantiates a new Queue for the client and stores it in a constant sequenceQueue
+    const sensors = req.params.sensorsPresent === '1';
+    const faultsSettings = req.params.withFaults.split(',');
+
+    const faults = faultsSettings[0] === '1';
+    const complexity = faultsSettings[1];
+
+    // Takes a sequence from a URL parameter, converts it to uppercase letter and splits it by commas
+    // The result will form an array of each of the actuations
+    let sequenceType = '';
+
+    // Each of the regular expression below is supposed to detect different type of sequence, if it is matching
+    // a regular expression it will add 1 to the sequence type string, otherwise it will add 0
+
+    // Regular expression that detects if sequence has multiple actuations occurring at once
+    sequenceType += ((req.params.sequence.toUpperCase().search(/\((([A-Z](\+|\-),)|([1-9]+[0-9]*S,))+([A-Z](\+|\-)|([1-9]+[0-9]*S))\)/) !== -1) ? 1 : 0);
+
+    // Regular expression that detects if sequence has repeated actions (e.g. through a counter)
+    sequenceType += ((req.params.sequence.toUpperCase().search(/\[(([A-Z](\+|\-),)|([1-9]+[0-9]*S,))*([A-Z](\+|\-)\)|([1-9]+[0-9]*S))\]\^([2-9]|[1-9]+[0-9]+)/) !== -1) ? 1 : 0);
+
+    // Regular expression that detects if sequence includes a timer
+    sequenceType += ((req.params.sequence.toUpperCase().search(/([1-9]+[0-9]*S)/) !== -1) ? 1 : 0);
+
+    console.log(sequenceType)
+
+    let sequence = req.params.sequence.toUpperCase().split(',');
+
+    // If concurrent, repetitive or timed sequence was detected it will return an error informing these types of sequences are not currently supported
+    if(sequenceType !== '000') {
+        res.send('Concurrent, repetitive and timed sequences are not currently supported!');
+    } else {
+        let code = {correct: generateCode(sequence, sequenceQueue, sensors, 0, ''), incorrect: generateCode(sequence, sequenceQueue, sensors, faults, complexity)}
+        res.send(code); // Sends response to the client
+    }
+});
+
 /**
  * Function that validates if the sequence provided is correct. If there are any errors they will be returned as an array
  * If there are no errors an empty array will be returned.
@@ -239,9 +279,11 @@ function isValid(sequence) {
  * @param sequence an array containing initially processed sequence
  * @param q empty Queue prepared for sequence generation
  * @param sensors true if sensors are present, false if sensors are not present
+ * @param faults boolean that controls whether to generate correct code or code with errors
+ * @param complexity complexity of faults generated
  * @returns {string} generated code based on the given sequence
  */
-function generateCode(sequence, q, sensors) {
+function generateCode(sequence, q, sensors, faults, complexity) {
     // Add all elements from the sequence array to the Queue
     for(const element of sequence) {
         q.enqueue(element);
@@ -269,10 +311,14 @@ function generateCode(sequence, q, sensors) {
     let invalid = false;
     let invalidElements = [];
     let currentCase = 10; // Current case count for actuations
+
+    let actionCount = 0;
+
     // Keeps iterating until the queue is fully emptied
     while(!q.isEmpty()) {
         // Empty the first element in the queue and assign it to element variable
         const element = q.dequeue();
+        actionCount++;
         if(element.length !== 2) {
             invalid = true;
             invalidElements.push(element);
@@ -347,6 +393,49 @@ function generateCode(sequence, q, sensors) {
         logicCode.splice(logicCode.length-2, 1);
     } else {
         logicCode.splice(logicCode.length-1, 1);
+    }
+
+    if(faults) {
+        let faultsLimit = 0;
+        let faultsCount = 0;
+        if(complexity === 'easy') {
+            faultsLimit = Math.ceil(logicCode.length/5);
+        } else if(complexity === 'medium') {
+            faultsLimit = Math.ceil(logicCode.length/4);
+        } else if(complexity === 'hard') {
+            faultsLimit = Math.ceil(logicCode.length/3);
+        }
+
+        while(faultsCount < faultsLimit) {
+            for(let i = 0; i < logicCode.length; i++) {
+                if(faultsCount >= faultsLimit) {
+                    break;
+                }
+
+                if(Math.floor(Math.random() * 10) < 3) {
+                    let faultOption = Math.floor(Math.random() * 3);
+                    switch(faultOption) {
+                        case 0:
+                            let currentElement = logicCode[i];
+                            if(i >= logicCode.length - 3) {
+                                logicCode[i] = logicCode[i - 2];
+                                logicCode[i - 2] = currentElement;
+                            } else {
+                                logicCode[i] = logicCode[i + 2];
+                                logicCode[i + 2] = currentElement;
+                            }
+                            break;
+                        case 1:
+                            logicCode[i] = logicCode[i].substring(0, logicCode[i].length - Math.ceil(Math.random()*3));
+                            break;
+                        case 2:
+                            logicCode.splice(i, 1);
+                            break;
+                    }
+                    faultsCount++;
+                }
+            }
+        }
     }
 
     // Generate the string containing the code, by joining setupCode array with line breaks followed by one more line break
