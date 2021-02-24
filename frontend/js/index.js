@@ -9,6 +9,12 @@ function generate() {
             document.getElementById('solutionButton').innerText = 'Show solution';
             document.getElementById('correct_code').innerHTML = '\nSOLUTION:\n\n' + response.correct.toString();
             document.getElementById('correct_code').style.float = 'left';
+            
+            if(typeof response.incorrect === 'undefined') {
+                document.getElementById('correct_code').style.display = 'inline-block';
+                document.getElementById('incorrect_code').style.display = 'none';
+                return false;
+            }
 
             if(!(errors === '0,none')) {
                 document.getElementById('solutionButton').style.display = 'inline-block';

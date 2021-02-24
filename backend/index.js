@@ -100,7 +100,7 @@ app.get('/sequence/generate/:sequence/:sensorsPresent/:withFaults', function(req
 
     // If concurrent, repetitive or timed sequence was detected it will return an error informing these types of sequences are not currently supported
     if(sequenceType !== '000') {
-        res.send('Concurrent, repetitive and timed sequences are not currently supported!');
+        res.send({correct: 'Concurrent, repetitive and timed sequences are not currently supported!'});
     } else {
         let code = {correct: generateCode(sequence, sequenceQueue, sensors, 0, ''), incorrect: generateCode(sequence, sequenceQueue, sensors, faults, complexity)}
         res.send(code); // Sends response to the client
