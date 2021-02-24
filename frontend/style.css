@@ -1,12 +1,13 @@
 #correct_code {
-    float: left;
-    width: 45vw;
+    float: right;
+    min-width: 35vw;
     min-height: 90vh;
+    display: none;
 }
 
 #incorrect_code {
-    float: right;
-    width: 45vw;
+    float: left;
+    min-width: 35vw;
     min-height: 90vh;
     display: none;
 }

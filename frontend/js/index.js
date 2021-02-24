@@ -6,9 +6,22 @@ function generate() {
     fetch('http://localhost:3000/sequence/generate/' + document.getElementById('sequence').value + '/' + checkbox + '/' + errors)
         .then(o => o.json())
         .then(response => {
-            document.getElementById('solutionButton').style.display = 'block';
-            document.getElementById('correct_code').innerHTML = '\n' + response.correct.toString();
-            document.getElementById('incorrect_code').innerHTML = '\n' + response.incorrect.toString();
+            document.getElementById('solutionButton').innerText = 'Show solution';
+            document.getElementById('correct_code').innerHTML = '\nSOLUTION:\n\n' + response.correct.toString();
+            document.getElementById('correct_code').style.float = 'left';
+
+            if(!(errors === '0,none')) {
+                document.getElementById('solutionButton').style.display = 'inline-block';
+                document.getElementById('incorrect_code').innerHTML = '\n\nCODE WITH ERRORS:\n\n' + response.incorrect.toString();
+                document.getElementById('correct_code').style.float = 'left';
+                document.getElementById('incorrect_code').style.float = 'left';
+                document.getElementById('correct_code').style.display = 'none';
+                document.getElementById('incorrect_code').style.display = 'inline-block';
+
+            } else {
+                document.getElementById('correct_code').style.display = 'inline-block';
+                document.getElementById('incorrect_code').style.display = 'none';
+            }
 
         });
 }
@@ -23,5 +36,11 @@ function validateSequence() {
 }
 
 function showSolution() {
-    document.getElementById('incorrect_code').style.display = 'block';
+    if( document.getElementById('correct_code').style.display === 'block') {
+        document.getElementById('correct_code').style.display = 'none';
+        document.getElementById('solutionButton').innerText = 'Show solution'
+    } else {
+        document.getElementById('correct_code').style.display = 'block';
+        document.getElementById('solutionButton').innerText = 'Hide solution'
+    }
 }

@@ -346,12 +346,12 @@ function generateCode(sequence, q, sensors, faults, complexity) {
                     logicCode.push('        IF "Cylinder_' + element[0] + '_Ret_Sensor" THEN');
                     logicCode.push('            Cylinder_' + element[0] + '_Extend := TRUE;'); // Extend cylinder
                     logicCode.push('            Cylinder_' + element[0] + '_Retract := FALSE;'); // Extend cylinder
-                    logicCode.push('            #NEXT := ' + currentCase + ''); // Move to the next case
+                    logicCode.push('            #NEXT := ' + currentCase + ';'); // Move to the next case
                     logicCode.push('        END_IF;<br>'); // Retract cylinder
                 } else {
                     logicCode.push('        Cylinder_' + element[0] + '_Extend := TRUE;'); // Extend cylinder
                     logicCode.push('        Cylinder_' + element[0] + '_Retract := FALSE;'); // Extend cylinder
-                    logicCode.push('        #NEXT := ' + currentCase + '<br>'); // Move to the next case
+                    logicCode.push('        #NEXT := ' + currentCase + ';<br>'); // Move to the next case
                 }
             // Checks if it is retraction
             } else if(element[1] === '-') {
@@ -360,12 +360,12 @@ function generateCode(sequence, q, sensors, faults, complexity) {
                     logicCode.push('        IF "Cylinder_' + element[0] + '_Ext_Sensor" THEN');
                     logicCode.push('            Cylinder_' + element[0] + '_Extend := FALSE;'); // Retract cylinder
                     logicCode.push('            Cylinder_' + element[0] + '_Retract := TRUE;'); // Retract cylinder
-                    logicCode.push('            #NEXT := ' + currentCase + ''); // Move to the next case
+                    logicCode.push('            #NEXT := ' + currentCase + ';'); // Move to the next case
                     logicCode.push('        END_IF;<br>'); // Retract cylinder
                 } else {
                     logicCode.push('        Cylinder_' + element[0] + '_Extend := FALSE;'); // Retract cylinder
                     logicCode.push('        Cylinder_' + element[0] + '_Retract := TRUE;'); // Retract cylinder
-                    logicCode.push('        #NEXT := ' + currentCase + '<br>'); // Move to the next case
+                    logicCode.push('        #NEXT := ' + currentCase + ';<br>'); // Move to the next case
                 }
             }
 
