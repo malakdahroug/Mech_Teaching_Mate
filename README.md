@@ -52,7 +52,7 @@ There are 51 tests in total (1 testing suite test, 1 endpoint test, 24 correct s
 
 ## Current release
 ##### Backend
-Current version 1.0.2b  
+Current version 1.0.3a  
 
 ##### Frontend
 Current version 1.0.0
@@ -62,11 +62,12 @@ Not available yet.
 
 ## Roadmap
 ### Backend
-- **Stage 1 - Simple sequences - CURRENT v. 1.0.2b**
+- **Stage 1 - Simple sequences - CURRENT v. 1.0.3a**
     - Break the sequence down - *v. 1.0.0*
     - Implement simple code generation - *v. 1.0.1*
     - Detect type of sequence(simple, concurrent, repetitive or timed) - **v. 1.0.1**
-    - Validate the sequence using regular expressions<sup>1</sup> - **CURRENT v. 1.0.2b**
+    - Validate the sequence using regular expressions<sup>1</sup> - **v. 1.0.2b**
+    - Implement simple mistake generation - **CURRENT v. 1.0.3a**
 - **Stage 2 - User sessions & projects**
     - Implement registration & login system that will be using database to store user data e.g. user projects
     - Create routes and backend procedures for the following:
@@ -143,6 +144,12 @@ Not available yet.
     - OPTIONAL: Implement own comm stack if it can address issues discovered in Communication Stack - Stage 1 (if there should be any)
 
 ## Changelog
+### Version 1.0.3a
+- Added simple error generation
+- All complexities include the same type of errors, different complexities will control how many errors to include
+- Improved the frontend page to allow user to select if code should be generated with errors as well as added minor features e.g. show solution when user generates code with mistakes 
+- Commented various parts of code that were not documented properly
+
 ### Version 1.0.2b - BUGFIX & TEST RELEASE
 - Added a set of automated API tests to verify correctness of the API.
 - Identified and addressed various bugs especially for looping sequences (where the whole sequence is surrounded with square brackets).

@@ -5,6 +5,7 @@ const express = require('express');
 const app = express(); // Instantiates express -> creates an Express object that will be used to deal with routes
 const queue = require('./queue') // Imports Queue module
 
+// Legacy route for generating the code based on the given sequence
 app.get('/generateSequence/:sequence/:sensorsPresent', function(req, res){
     // Temporary Cross Origin workaround
     res.header("Access-Control-Allow-Origin", "*");
@@ -40,7 +41,7 @@ app.get('/generateSequence/:sequence/:sensorsPresent', function(req, res){
     }
 });
 
-
+// Sequence validation route
 app.get('/sequence/isValid/:sequence', function(req, res){
     // Temporary Cross Origin workaround
     res.header("Access-Control-Allow-Origin", "*");
@@ -67,15 +68,26 @@ app.get('/sequence/isValid/:sequence', function(req, res){
     // #END - For testing only - if not running tests - comment
 });
 
+// New route for generating code with errors
 app.get('/sequence/generate/:sequence/:sensorsPresent/:withFaults', function(req, res){
     // Temporary Cross Origin workaround
     res.header("Access-Control-Allow-Origin", "*");
 
     const sequenceQueue = new queue(); // Instantiates a new Queue for the client and stores it in a constant sequenceQueue
+
+    // If sensorsPresent URL param is set to 1 it means sequence should be generated with sensors included
     const sensors = req.params.sensorsPresent === '1';
+
+    // Splitting withFaults parameter by comma as they arrive in the following form 1,easy/hard/medium or 0,none
+    // If the value before comma is one it means sequence is supposed to be generated with errors
+    // The second parameter (after comma) controls the difficulty
     const faultsSettings = req.params.withFaults.split(',');
 
+    // If the first URL parameter (withFaults) is set to 1, faults settings will be set to true which will result
+    // in generating code with errors
     const faults = faultsSettings[0] === '1';
+
+    // Errors complexity is extracted from the second parameter of withFaults
     const complexity = faultsSettings[1];
 
     // Takes a sequence from a URL parameter, converts it to uppercase letter and splits it by commas
@@ -102,6 +114,7 @@ app.get('/sequence/generate/:sequence/:sensorsPresent/:withFaults', function(req
     if(sequenceType !== '000') {
         res.send({correct: 'Concurrent, repetitive and timed sequences are not currently supported!'});
     } else {
+        // Prepare code object - it will contain both correct and incorrect sequences
         let code = {correct: generateCode(sequence, sequenceQueue, sensors, 0, ''), incorrect: generateCode(sequence, sequenceQueue, sensors, faults, complexity)}
         res.send(code); // Sends response to the client
     }
@@ -395,8 +408,15 @@ function generateCode(sequence, q, sensors, faults, complexity) {
         logicCode.splice(logicCode.length-1, 1);
     }
 
+    // After code is generated, the function checks if faults parameter is set to true
+    // If it is it will modify logic code to generate some errors
     if(faults) {
+
+        // Setting initial value of faultsLimit to 0, it will be amended depending on complexity chosen
+        // Using a formulae from the next set of if - else-if statements
         let faultsLimit = 0;
+
+        // Current number of errors generated
         let faultsCount = 0;
         if(complexity === 'easy') {
             faultsLimit = Math.ceil(logicCode.length/5);
@@ -406,13 +426,26 @@ function generateCode(sequence, q, sensors, faults, complexity) {
             faultsLimit = Math.ceil(logicCode.length/3);
         }
 
+        // If number of generated faults is less than a limit - it will keep repeating until it generates enough errors
         while(faultsCount < faultsLimit) {
+
+            // It will keep iterating through logicCode array
             for(let i = 0; i < logicCode.length; i++) {
+
+                // Checks if enough faults were generated already, if so - it will break the loop as well as condition
+                // of the while loop won't be satisfied anymore
                 if(faultsCount >= faultsLimit) {
                     break;
                 }
 
+                // Generates a pseudo random number between 0 and 10,
+                // if the number is smaller than 3 (which maps to roughly 30% chances of error being generated in that line)
+                // it will then generate an error
                 if(Math.floor(Math.random() * 10) < 3) {
+                    // Generates a random number between 0 and 2 to decide which type of fault to include
+                    // - 0 -> will shift line of code 2 lines forward (for the last 3 lines it will shift them 2 lines backward)
+                    // - 1 -> it will remove up to 3 characters from the end of the string
+                    // - 2 -> it will completely remove the line of code
                     let faultOption = Math.floor(Math.random() * 3);
                     switch(faultOption) {
                         case 0:
@@ -432,6 +465,8 @@ function generateCode(sequence, q, sensors, faults, complexity) {
                             logicCode.splice(i, 1);
                             break;
                     }
+
+                    // When the fault was generated increment faultCount
                     faultsCount++;
                 }
             }
