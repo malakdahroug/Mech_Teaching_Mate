@@ -9,8 +9,10 @@
 <body>
     <label for="sequence">Sequence:</label><br>
     <input type="text" id="sequence"><br>
+
     <label for="withSensors">Sensors present?</label>
     <input type="checkbox" id="withSensors"><br>
+
     <label for="withFaults">Errors to generate:</label><br>
     <select id="withFaults">
         <option value="0,none">None</option>
@@ -18,6 +20,7 @@
         <option value="1,medium">Medium</option>
         <option value="1,hard">Hard</option>
     </select><br>
+
     <button onClick="generate();">Generate code</button><br><br>
     <button onClick="showSolution();" id="solutionButton">Show solution</button><br><br>
     <pre>

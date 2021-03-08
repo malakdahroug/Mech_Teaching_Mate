@@ -3,7 +3,22 @@
 // Express will parse it and return the right response based on the business logics
 const express = require('express');
 const app = express(); // Instantiates express -> creates an Express object that will be used to deal with routes
-const queue = require('./queue') // Imports Queue module
+const queue = require('./queue'); // Imports Queue module
+const bodyParser = require('body-parser'); // Module that parses body of the HTTP request - used for POST requests
+const passwordHash = require('password-hash'); // Module that hashes the passwords
+
+// Configures express to use body-parser
+app.use(bodyParser.json() );       // to support JSON-encoded bodies
+app.use(bodyParser.urlencoded({     // to support URL-encoded bodies
+    extended: true
+}));
+
+// Mock data for testing if registration works fine
+let mockUsers = [
+    {id: 1, name: 'John Smith', username: 'john', email: 'john@smith.com', password: passwordHash.generate('xxx')},
+    {id: 2, name: 'Adam Smith', username: 'adam', email: 'adam@smith.com', password: passwordHash.generate('xxx')},
+    {id: 3, name: 'Beth Smith', username: 'beth', email: 'beth@smith.com', password: passwordHash.generate('xxx')},
+];
 
 // Legacy route for generating the code based on the given sequence
 app.get('/generateSequence/:sequence/:sensorsPresent', function(req, res){
@@ -118,6 +133,72 @@ app.get('/sequence/generate/:sequence/:sensorsPresent/:withFaults', function(req
         let code = {correct: generateCode(sequence, sequenceQueue, sensors, 0, ''), incorrect: generateCode(sequence, sequenceQueue, sensors, faults, complexity)}
         res.send(code); // Sends response to the client
     }
+});
+
+// POST route was used as the data passed in the form is sensitive. This will prevent the application from adding user
+// data to the URL. It is more secure than GET request.
+app.post('/user/register', function (req, res) {
+    // Temporary Cross Origin workaround
+    res.header("Access-Control-Allow-Origin", "*");
+
+    // Retrieve data from the form
+    const name = req.body.name; // Name, does not have to be unique
+    const username = req.body.username; // Username, it has to be unique
+    const password = req.body.password; // Password, does not have to be unique must be the same as password2
+    const password2 = req.body.password2;
+    const email = req.body.email; // Email address, it has to be unique
+
+    // Checks if user with the given email address exists, if it does it will return an index of it in the array
+    // otherwise it will assign -1 to emailExists
+    const emailExists = mockUsers.findIndex(e => e.email === email.toLowerCase());
+
+    // Checks if user with the given username address exists, if it does it will return an index of it in the array
+    // otherwise it will assign -1 to usernameExists
+    const usernameExists = mockUsers.findIndex(e => e.username === username.toLowerCase());
+
+    // Checks if all form fields have been filled
+    if(name === '' || username === '' || password === '' || password2 === '' || email === '') {
+        res.send({status: 'Error', msg: 'All form fields are required!'});
+    // Checks if password is not equal to password, if true it will return an error
+    } else if(password !== password2) {
+        res.send({status: 'Error', msg: 'Passwords do not match!'});
+    // Checks if email is already registered in the database, if true it will throw an error
+    } else if(emailExists !== -1) {
+        res.send({status: 'Error', msg: 'User with email provided exists already!'});
+    // Checks if username is already registered in the database, if true it will throw an error
+    } else if(usernameExists !== -1) {
+        res.send({status: 'Error', msg: 'User with username provided exists already!'});
+    // If no errors were present it will return status OK and add given user to the mockUsers table
+    } else {
+        mockUsers.push({id: mockUsers.length + 1, name: name, username: username.toLowerCase(), email: email.toLowerCase(), password: passwordHash.generate(password)});
+        console.log(mockUsers);
+        res.send({status: 'OK', msg: 'User registered successfully!'});
+    }
+});
+
+// POST route that authenticates users (login system). POST was chosen as it is much more secure than GET which adds
+// parameters to the URL rather than sending them in request body.
+app.post('/user/login', function(req, res) {
+    // Retrieve POST parameters
+    const username = req.body.username.toLowerCase(); // Username
+    const password = req.body.password; // Password
+
+
+    // Find user in the mockUsers array, if it does not exist it will return undefined
+    const user = mockUsers.find(e => e.username === username);
+
+    // If user does not exist return an error
+    if(user === undefined) {
+        res.send({status: 'Error', msg: 'Username does not exist or password provided is incorrect!'});
+    // If password matches, authenticate the user
+    } else if(passwordHash.verify(password, user.password)) {
+        res.send({status: 'OK', msg: 'User authenticated successfully!'});
+    // If password does not match, return an error, the same error is returned if username does not exist and if password
+    // does not match as per security recommendations
+    } else {
+        res.send({status: 'Error', msg: 'Username does not exist or password provided is incorrect!'});
+    }
+
 });
 
 /**
