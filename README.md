@@ -62,21 +62,21 @@ Not available yet.
 
 ## Roadmap
 ### Backend
-- **Stage 1 - Simple sequences - CURRENT v. 1.0.3a**
+- **Stage 1 - Simple sequences**
     - Break the sequence down - *v. 1.0.0*
     - Implement simple code generation - *v. 1.0.1*
     - Detect type of sequence(simple, concurrent, repetitive or timed) - **v. 1.0.1**
     - Validate the sequence using regular expressions<sup>1</sup> - **v. 1.0.2b**
-    - Implement simple mistake generation - **CURRENT v. 1.0.3a**
-- **Stage 2 - User sessions & projects**
-    - Implement registration & login system that will be using database to store user data e.g. user projects
-    - Create routes and backend procedures for the following:
+    - Implement simple mistake generation - **v. 1.0.3a**
+- **Stage 2 - User sessions & projects**  - **CURRENT v. 2.0.2**
+    - Implement registration & login system that will be using database to store user data e.g. user projects - **v. 2.0.0**
+    - Create routes and backend procedures for the following:  - **v. 2.0.1**
         - login
         - registration
-        - project operations
-        - sequence generation history
+        - project operations - *PENDING expected in v. 2.0.3*
+        - sequence generation history - *PENDING expected in v. 2.0.3*
         - others that will be identified during the development
-    - Add user ability to create project
+    - Add user ability to create project  - **CURRENT v. 2.0.2**
     - Add user ability to configure project (e.g. define tag names or types of cylinders)
 - **Stage 3 - Concurrent sequences**
     - Correctly detect sequence type
@@ -144,6 +144,21 @@ Not available yet.
     - OPTIONAL: Implement own comm stack if it can address issues discovered in Communication Stack - Stage 1 (if there should be any)
 
 ## Changelog
+### Version 2.0.2
+- Defined Schemas for Projects and ProjectConfigs to be stored in MongoDB
+- Added backend GET route to fulfill project creation functionality
+- Projects will only be created for sequences that were not attempted by this user before
+
+### Version 2.0.1
+- Added database connections
+- Defined Schema for User objects to be stored in MongoDB  
+- Fulfilled login and registration functionalities through POST backend routes
+
+### Version 2.0.0
+- Added simple login / registration system using local array
+
+---
+
 ### Version 1.0.3a
 - Added simple error generation
 - All complexities include the same type of errors, different complexities will control how many errors to include

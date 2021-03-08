@@ -6,6 +6,9 @@ const app = express(); // Instantiates express -> creates an Express object that
 const queue = require('./queue'); // Imports Queue module
 const bodyParser = require('body-parser'); // Module that parses body of the HTTP request - used for POST requests
 const passwordHash = require('password-hash'); // Module that hashes the passwords
+const mongoose = require('mongoose'); // Module that handles database connection
+
+mongoose.connect('mongodb://localhost:27017/teaching-mate', {useNewUrlParser: true, useUnifiedTopology: true});
 
 // Configures express to use body-parser
 app.use(bodyParser.json() );       // to support JSON-encoded bodies
@@ -13,46 +16,85 @@ app.use(bodyParser.urlencoded({     // to support URL-encoded bodies
     extended: true
 }));
 
-// Mock data for testing if registration works fine
-let mockUsers = [
-    {id: 1, name: 'John Smith', username: 'john', email: 'john@smith.com', password: passwordHash.generate('xxx')},
-    {id: 2, name: 'Adam Smith', username: 'adam', email: 'adam@smith.com', password: passwordHash.generate('xxx')},
-    {id: 3, name: 'Beth Smith', username: 'beth', email: 'beth@smith.com', password: passwordHash.generate('xxx')},
-];
+// DATABASE SCHEMAS START - Schemas for each of the collections used by the application
+const User = mongoose.model('User', { name: String, username: String, email: String, password: String });
+const Project = mongoose.model('Project', { user_id: String, project_name: String, project_sequence: String, validity: Boolean });
+const ProjectConfig = mongoose.model('ProjectConfig', { project_id: String, assigned_elements: Array });
+// DATABASE SCHEMAS END
 
-// Legacy route for generating the code based on the given sequence
-app.get('/generateSequence/:sequence/:sensorsPresent', function(req, res){
+// // Legacy route for generating the code based on the given sequence
+// app.get('/generateSequence/:sequence/:sensorsPresent', function(req, res){
+//     // Temporary Cross Origin workaround
+//     res.header("Access-Control-Allow-Origin", "*");
+//
+//     const sequenceQueue = new queue(); // Instantiates a new Queue for the client and stores it in a constant sequenceQueue
+//     const sensors = req.params.sensorsPresent === '1';
+//
+//     // Takes a sequence from a URL parameter, converts it to uppercase letter and splits it by commas
+//     // The result will form an array of each of the actuations
+//     let sequenceType = '';
+//
+//     // Each of the regular expression below is supposed to detect different type of sequence, if it is matching
+//     // a regular expression it will add 1 to the sequence type string, otherwise it will add 0
+//
+//     // Regular expression that detects if sequence has multiple actuations occurring at once
+//     sequenceType += ((req.params.sequence.toUpperCase().search(/\((([A-Z](\+|\-),)|([1-9]+[0-9]*S,))+([A-Z](\+|\-)|([1-9]+[0-9]*S))\)/) !== -1) ? 1 : 0);
+//
+//     // Regular expression that detects if sequence has repeated actions (e.g. through a counter)
+//     sequenceType += ((req.params.sequence.toUpperCase().search(/\[(([A-Z](\+|\-),)|([1-9]+[0-9]*S,))*([A-Z](\+|\-)\)|([1-9]+[0-9]*S))\]\^([2-9]|[1-9]+[0-9]+)/) !== -1) ? 1 : 0);
+//
+//     // Regular expression that detects if sequence includes a timer
+//     sequenceType += ((req.params.sequence.toUpperCase().search(/([1-9]+[0-9]*S)/) !== -1) ? 1 : 0);
+//
+//     console.log(sequenceType)
+//
+//     let sequence = req.params.sequence.toUpperCase().split(',');
+//
+//     // If concurrent, repetitive or timed sequence was detected it will return an error informing these types of sequences are not currently supported
+//     if(sequenceType !== '000') {
+//         res.send('Concurrent, repetitive and timed sequences are not currently supported!');
+//     } else {
+//         res.send(generateCode(sequence, sequenceQueue, sensors)); // Sends response to the client
+//     }
+// });
+
+// Route that handles the project creation
+app.get('/project/create/:id/:name/:sequence', async function(req, res){
     // Temporary Cross Origin workaround
     res.header("Access-Control-Allow-Origin", "*");
 
-    const sequenceQueue = new queue(); // Instantiates a new Queue for the client and stores it in a constant sequenceQueue
-    const sensors = req.params.sensorsPresent === '1';
+    // Check validity of the sequence provided - if the sequence is correct the project will be added to the database
+    const validator = isValid(req.params.sequence.toUpperCase().split(','));
+    const validity = validator.length === 0;
 
-    // Takes a sequence from a URL parameter, converts it to uppercase letter and splits it by commas
-    // The result will form an array of each of the actuations
-    let sequenceType = '';
+    // If sequence provided is valid, add the project to the database and create a ProjectConfig for it
+    if(validity) {
+        // Describe the new project
+        const newProject = new Project({user_id: req.params.id, project_name: req.params.name, project_sequence: req.params.sequence, validity: validity});
 
-    // Each of the regular expression below is supposed to detect different type of sequence, if it is matching
-    // a regular expression it will add 1 to the sequence type string, otherwise it will add 0
+        // Try to get records from the database that match the sequence provided and id of the user
+        const project = await Project.find({project_sequence: req.params.sequence, user_id: req.params.id}).exec();
 
-    // Regular expression that detects if sequence has multiple actuations occurring at once
-    sequenceType += ((req.params.sequence.toUpperCase().search(/\((([A-Z](\+|\-),)|([1-9]+[0-9]*S,))+([A-Z](\+|\-)|([1-9]+[0-9]*S))\)/) !== -1) ? 1 : 0);
+        // If user does not have a project fulfilling this sequence add it to the database
+        if(project.length === 0) {
+            // Add new project to the database
+            newProject.save().then(() => {
+                // When the project gets successfully created, create an object for the ProjectConfig
+                const newProjectConfig = new ProjectConfig({project_id: newProject._id, assigned_elements: []});
 
-    // Regular expression that detects if sequence has repeated actions (e.g. through a counter)
-    sequenceType += ((req.params.sequence.toUpperCase().search(/\[(([A-Z](\+|\-),)|([1-9]+[0-9]*S,))*([A-Z](\+|\-)\)|([1-9]+[0-9]*S))\]\^([2-9]|[1-9]+[0-9]+)/) !== -1) ? 1 : 0);
-
-    // Regular expression that detects if sequence includes a timer
-    sequenceType += ((req.params.sequence.toUpperCase().search(/([1-9]+[0-9]*S)/) !== -1) ? 1 : 0);
-
-    console.log(sequenceType)
-
-    let sequence = req.params.sequence.toUpperCase().split(',');
-
-    // If concurrent, repetitive or timed sequence was detected it will return an error informing these types of sequences are not currently supported
-    if(sequenceType !== '000') {
-        res.send('Concurrent, repetitive and timed sequences are not currently supported!');
+                // Add new ProjectConfig to the database
+                newProjectConfig.save().then(() => {
+                    // If everything succeeded return message to the frontend informing that project was added
+                    res.send({status: 'OK', msg: {data: 'Project has been created successfully!', project_id: newProject._id}});
+                });
+            });
+        } else {
+            // If user has an existing project fulfilling given sequence return an error informing the user that project exists already
+            res.send({status: 'Error', msg: {data: 'You have an existing project for this sequence already!', project_id: project[0]._id}});
+        }
     } else {
-        res.send(generateCode(sequence, sequenceQueue, sensors)); // Sends response to the client
+        // If sequence has error do not add it to the database, return an error to the user
+        res.send({status: 'Error', msg: {data: 'An error has occurred please fix the sequence!', errors: validator}});
     }
 });
 
@@ -137,7 +179,7 @@ app.get('/sequence/generate/:sequence/:sensorsPresent/:withFaults', function(req
 
 // POST route was used as the data passed in the form is sensitive. This will prevent the application from adding user
 // data to the URL. It is more secure than GET request.
-app.post('/user/register', function (req, res) {
+app.post('/user/register', async function (req, res) {
     // Temporary Cross Origin workaround
     res.header("Access-Control-Allow-Origin", "*");
 
@@ -148,13 +190,10 @@ app.post('/user/register', function (req, res) {
     const password2 = req.body.password2;
     const email = req.body.email; // Email address, it has to be unique
 
-    // Checks if user with the given email address exists, if it does it will return an index of it in the array
-    // otherwise it will assign -1 to emailExists
-    const emailExists = mockUsers.findIndex(e => e.email === email.toLowerCase());
-
-    // Checks if user with the given username address exists, if it does it will return an index of it in the array
-    // otherwise it will assign -1 to usernameExists
-    const usernameExists = mockUsers.findIndex(e => e.username === username.toLowerCase());
+    // Checks if user with the given email address exists in the database - if it is emailExists will be set to true
+    const emailExists = await User.findOne({email: email}).exec() !== null;
+    // Checks if user with the given username exists in the database - if it is usernameExists will be set to true
+    const usernameExists = await User.findOne({username: username}).exec() !== null;
 
     // Checks if all form fields have been filled
     if(name === '' || username === '' || password === '' || password2 === '' || email === '') {
@@ -163,32 +202,30 @@ app.post('/user/register', function (req, res) {
     } else if(password !== password2) {
         res.send({status: 'Error', msg: 'Passwords do not match!'});
     // Checks if email is already registered in the database, if true it will throw an error
-    } else if(emailExists !== -1) {
+    } else if(emailExists) {
         res.send({status: 'Error', msg: 'User with email provided exists already!'});
     // Checks if username is already registered in the database, if true it will throw an error
-    } else if(usernameExists !== -1) {
+    } else if(usernameExists) {
         res.send({status: 'Error', msg: 'User with username provided exists already!'});
-    // If no errors were present it will return status OK and add given user to the mockUsers table
+    // If no errors were present it will return status OK and add given user to the users collection in MongoDB
     } else {
-        mockUsers.push({id: mockUsers.length + 1, name: name, username: username.toLowerCase(), email: email.toLowerCase(), password: passwordHash.generate(password)});
-        console.log(mockUsers);
-        res.send({status: 'OK', msg: 'User registered successfully!'});
+        const newUser = new User({ name: name, username: username.toLowerCase(), email: email.toLowerCase(), password: passwordHash.generate(password)});
+        newUser.save().then(() => res.send({status: 'OK', msg: 'User registered successfully!'}));
     }
 });
 
 // POST route that authenticates users (login system). POST was chosen as it is much more secure than GET which adds
 // parameters to the URL rather than sending them in request body.
-app.post('/user/login', function(req, res) {
+app.post('/user/login', async function(req, res) {
     // Retrieve POST parameters
     const username = req.body.username.toLowerCase(); // Username
     const password = req.body.password; // Password
 
-
-    // Find user in the mockUsers array, if it does not exist it will return undefined
-    const user = mockUsers.find(e => e.username === username);
+    // Find user in the database and assign it to user constant - if user was not found it will assign null
+    const user = await User.findOne({username: username}).exec();
 
     // If user does not exist return an error
-    if(user === undefined) {
+    if(user === null) {
         res.send({status: 'Error', msg: 'Username does not exist or password provided is incorrect!'});
     // If password matches, authenticate the user
     } else if(passwordHash.verify(password, user.password)) {
@@ -198,7 +235,6 @@ app.post('/user/login', function(req, res) {
     } else {
         res.send({status: 'Error', msg: 'Username does not exist or password provided is incorrect!'});
     }
-
 });
 
 /**
