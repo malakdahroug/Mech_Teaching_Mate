@@ -1,0 +1,44 @@
+<a class="navbar-brand" href="#">Mechatronics Teaching Mate</a>
+    <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#navbarNavDropdown" aria-controls="navbarNavDropdown" aria-expanded="false" aria-label="Toggle navigation">
+        <span class="navbar-toggler-icon"></span>
+    </button>
+    <div class="collapse navbar-collapse" id="navbarNavDropdown">
+        <ul class="navbar-nav">
+            <li class="nav-item">
+                <a class="nav-link" href="index.html">Home</a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link" href="#">About</a>
+            </li>
+            <li class="nav-item" id="instructionsLink">
+                <a class="nav-link" href="#">Instructions</a>
+            </li>
+            <li class="nav-item dropdown hidden" id="projectLinks">
+                <a class="nav-link dropdown-toggle" href="#" id="navbarDropdown2MenuLink" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+                    Projects
+                </a>
+                <div class="dropdown-menu" aria-labelledby="navbarDropdownMenuLink">
+                    <a class="dropdown-item" href="#">Create project</a>
+                    <a class="dropdown-item" href="#">Manage projects</a>
+                    <a class="dropdown-item" href="#">Manage project components</a>
+                </div>
+            </li>
+            <li class="nav-item hidden" id="generatorLink">
+                <a class="nav-link" href="generator.html">Generator</a>
+            </li>
+            <li class="nav-item hidden" id="validatorLink">
+                <a class="nav-link" href="validator.html">Validator</a>
+            </li>
+            <li class="nav-item dropdown">
+                <a class="nav-link dropdown-toggle" href="#" id="navbarDropdownMenuLink" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+                    Profile
+                </a>
+                <div class="dropdown-menu" aria-labelledby="navbarDropdownMenuLink">
+                    <a class="dropdown-item" href="#" data-toggle="modal" data-target="#signinModal" id="signinLink">Sign in</a>
+                    <a class="dropdown-item" href="#" data-toggle="modal" data-target="#signupModal" id="regLink">Sing up</a>
+                    <a class="dropdown-item hidden" href="#" data-toggle="modal" data-target="#signupModal" id="profileLink">My profile</a>
+                    <a class="dropdown-item hidden" href="#" onclick="logout()" id="logoutLink">Logout</a>
+                </div>
+            </li>
+        </ul>
+    </div>

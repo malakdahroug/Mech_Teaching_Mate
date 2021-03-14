@@ -7,6 +7,7 @@ const queue = require('./queue'); // Imports Queue module
 const bodyParser = require('body-parser'); // Module that parses body of the HTTP request - used for POST requests
 const passwordHash = require('password-hash'); // Module that hashes the passwords
 const mongoose = require('mongoose'); // Module that handles database connection
+const cors = require('cors');
 
 mongoose.connect('mongodb://localhost:27017/teaching-mate', {useNewUrlParser: true, useUnifiedTopology: true});
 
@@ -15,6 +16,13 @@ app.use(bodyParser.json() );       // to support JSON-encoded bodies
 app.use(bodyParser.urlencoded({     // to support URL-encoded bodies
     extended: true
 }));
+
+app.use(
+    cors({
+        origin: ["http://localhost:63342"]
+    })
+);
+app.options("*", cors()); // include before other routes
 
 // DATABASE SCHEMAS START - Schemas for each of the collections used by the application
 const User = mongoose.model('User', { name: String, username: String, email: String, password: String });
@@ -210,7 +218,7 @@ app.post('/user/register', async function (req, res) {
     // If no errors were present it will return status OK and add given user to the users collection in MongoDB
     } else {
         const newUser = new User({ name: name, username: username.toLowerCase(), email: email.toLowerCase(), password: passwordHash.generate(password)});
-        newUser.save().then(() => res.send({status: 'OK', msg: 'User registered successfully!'}));
+        newUser.save().then((e) => res.send({status: 'OK', msg: 'User registered successfully!'}));
     }
 });
 
@@ -219,6 +227,7 @@ app.post('/user/register', async function (req, res) {
 app.post('/user/login', async function(req, res) {
     // Retrieve POST parameters
     const username = req.body.username.toLowerCase(); // Username
+
     const password = req.body.password; // Password
 
     // Find user in the database and assign it to user constant - if user was not found it will assign null
@@ -229,7 +238,7 @@ app.post('/user/login', async function(req, res) {
         res.send({status: 'Error', msg: 'Username does not exist or password provided is incorrect!'});
     // If password matches, authenticate the user
     } else if(passwordHash.verify(password, user.password)) {
-        res.send({status: 'OK', msg: 'User authenticated successfully!'});
+        res.send({status: 'OK', msg: 'User authenticated successfully!', details: user._id});
     // If password does not match, return an error, the same error is returned if username does not exist and if password
     // does not match as per security recommendations
     } else {

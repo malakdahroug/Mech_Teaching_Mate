@@ -5,28 +5,48 @@
     <title>Mechatronic Teaching Mate - Malak Dahroug</title>
     <script src="js/functions.js" type="application/javascript"></script>
     <link href="css/style.css" rel="stylesheet">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <!-- Material Design for Bootstrap fonts and icons -->
     <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,400,500,700|Material+Icons">
     <link rel="stylesheet" href="https://fonts.googleapis.com/icon?family=Material+Icons">
     <!-- Material Design for Bootstrap CSS -->
     <link rel="stylesheet" href="https://unpkg.com/bootstrap-material-design@4.1.1/dist/css/bootstrap-material-design.min.css" integrity="sha384-wXznGJNEXNG1NFsbm0ugrLFMQPWswR3lds2VeinahP8N0zJw9VWSopbjv2x7WCvX" crossorigin="anonymous">
 </head>
-<body onLoad="setup('index');">
+<body onLoad="setup('generator');">
 <nav class="navbar navbar-expand-lg navbar-light bg-primary pad20" id="nav"></nav>
 <div id="modals"></div>
-
 <div class="container content">
-    <div class="row">
-        <div class="col-lg bg-light">
-            Lorem ipsum dolor sit amet consectetur, adipisicing elit. Iste atque ea quis
-            molestias. Fugiat pariatur maxime quis culpa corporis vitae repudiandae aliquam
-            voluptatem veniam, est atque cumque eum delectus sint!
+    <div class="row bg-light pad1">
+        <div class="col-lg">
+            <form class="form-signin text-center">
+                <label for="sequence" class="sr-only">Sequence:</label>
+                <input type="text" id="sequence" class="form-control margin-b-2" placeholder="Sequence">
+
+                <label for="withSensors">Sensors present?</label>
+                <input type="checkbox" id="withSensors" class="form-control margin-b-2">
+
+                <label for="withFaults">Errors to generate:</label>
+                <select id="withFaults" class="form-control margin-b-2" placeholder="Full name">
+                    <option value="0,none">None</option>
+                    <option value="1,easy">Easy</option>
+                    <option value="1,medium">Medium</option>
+                    <option value="1,hard">Hard</option>
+                </select><br>
+                <div class="error" id="sequenceError"></div>
+            </form>
+            <div class="text-center">
+                <button class="btn btn-lg btn-primary" onClick="generate();">Generate code</button>
+                <button class="btn btn-lg btn-primary" onClick="showSolution();" id="solutionButton">Show solution</button><br><br>
+            </div>
+            <pre id="codeblocks">
+                <code id="incorrect_code"></code>
+                <code id="correct_code"></code>
+            </pre>
+
         </div>
     </div>
 </div>
-
 <footer class="bg-light text-center text-lg-start" id="footer"></footer>
-
 <!-- Optional JavaScript -->
 <!-- jQuery first, then Popper.js, then Bootstrap JS -->
 <script src="https://code.jquery.com/jquery-3.2.1.slim.min.js" integrity="sha384-KJ3o2DKtIkvYIK3UENzmM7KCkRr/rE9/Qpg6aAZGJwFDMVNA/GpGFF93hXpG5KkN" crossorigin="anonymous"></script>
