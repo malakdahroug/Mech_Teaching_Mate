@@ -1,3 +1,7 @@
+body {
+    overflow-x: hidden;
+}
+
 .pad20 {
     padding: 1rem 20vw!important;
 }
@@ -50,6 +54,42 @@ footer {
 
 .pad1 {
     padding: 1rem;
+}
+
+.page-title {
+    font-size: 1.75rem;
+    text-transform: capitalize;
+    letter-spacing: 0.25rem;
+    margin-bottom: 2rem;
+}
+
+#projects {
+    display: flex;
+    flex-direction: column;
+    flex-wrap: nowrap;
+}
+
+.project-row {
+    display: flex;
+    flex-direction: row;
+    flex-wrap: nowrap;
+    justify-content: space-between;
+    border: 1px solid grey;
+    margin: 0.125rem;
+}
+
+.project-row:nth-child(odd) {
+    background: #FBFBFB;
+}
+
+.project-row:nth-child(even) {
+    background: #EFEFEF;
+}
+
+.cell {
+    color: black;
+    min-width: 30%;
+    text-align: center;
 }
 
 @media (max-width: 767px) {

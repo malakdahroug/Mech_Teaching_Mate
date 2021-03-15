@@ -8,20 +8,20 @@
                 </button>
             </div>
             <div class="modal-body">
-                <form class="form-signin text-center">
+                <form class="form-signin text-center" id="signinForm">
                     <img class="mb-4" src="https://via.placeholder.com/250x250" alt="" >
                     <label for="inputUsernameLogin" class="sr-only">Username</label>
                     <input type="text" id="inputUsernameLogin" class="form-control margin-b-2" placeholder="Username" required autofocus>
                     <label for="inputPasswordLogin" class="sr-only">Password</label>
                     <input type="password" id="inputPasswordLogin" class="form-control margin-b-2" placeholder="Password" required>
-                    <div class="checkbox mb-3">
-                        <label>
-                            <input type="checkbox" value="remember-me"> Remember me
+
+                    <input type="checkbox" id="inputRememberLogin" value="remember-me">
+                        <label for="inputRememberLogin">
+                            Remember me
                         </label>
-                    </div>
-                    <button class="btn btn-lg btn-primary btn-block" onClick="signin()">Sign in</button>
                     <div class="error" id="loginError"></div>
                 </form>
+                <button class="btn btn-lg btn-primary btn-block" onClick="signin()">Sign in</button>
             </div>
         </div>
     </div>
@@ -37,7 +37,7 @@
                 </button>
             </div>
             <div class="modal-body">
-                <form class="form-signin text-center">
+                <form class="form-signin text-center" id="regForm">
                     <img class="mb-4" src="https://via.placeholder.com/250x250" alt="" >
                     <label for="inputNameReg" class="sr-only">Full name</label>
                     <input type="text" id="inputNameReg" class="form-control margin-b-2" placeholder="Full name" required autofocus>
@@ -49,9 +49,9 @@
                     <input type="password" id="inputPasswordReg" class="form-control margin-b-2" placeholder="Password" required>
                     <label for="inputRepeatPasswordReg" class="sr-only">Repeat password</label>
                     <input type="password" id="inputRepeatPasswordReg" class="form-control margin-b-2" placeholder="Repeat password" required>
-                    <button class="btn btn-lg btn-primary btn-block" onClick="signup()">Sign up</button>
                     <div class="error" id="regError"></div>
                 </form>
+                <button class="btn btn-lg btn-primary btn-block" onClick="signup()">Sign up</button>
             </div>
         </div>
     </div>

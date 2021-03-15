@@ -2,6 +2,8 @@ const signin = () => {
     const username = document.querySelector('#inputUsernameLogin').value;
     const password = document.querySelector('#inputPasswordLogin').value;
 
+    const remember = document.querySelector('#inputRememberLogin').checked;
+
     const payload = {
       username: username,
       password: password
@@ -30,9 +32,17 @@ const signin = () => {
             } else {
                 document.querySelector('#loginError').classList.remove('error');
                 document.querySelector('#loginError').innerHTML = res.msg;
-                setCookie('uid', res.details, 3, 'h');
-                setCookie('username', username, 3, 'h');
+                if(remember) {
+                    setCookie('uid', res.details, 7, 'd');
+                    setCookie('username', username, 7, 'd');
+                } else {
+                    setCookie('uid', res.details, 3, 'h');
+                    setCookie('username', username, 3, 'h');
+                }
                 displayNav();
+                $('#signinModal').modal('hide');
+                document.querySelector('#signinForm').reset();
+                document.querySelector('#loginError').innerHTML = '';
             }
         });
 };
@@ -44,6 +54,8 @@ const signup = () => {
     const password = document.querySelector('#inputPasswordReg').value;
     const password2 = document.querySelector('#inputRepeatPasswordReg').value;
 
+    const emailValidator = /\S+@\S+\.\S+/;
+
     if(name === '' || username === '' || password === '' || password2 === '' || email === '') {
         document.querySelector('#regError').innerHTML = 'All form fields are required!';
         return;
@@ -52,6 +64,9 @@ const signup = () => {
         return;
     } else if(password.length < 5) {
         document.querySelector('#regError').innerHTML = 'Password must contain at least 5 characters!';
+        return;
+    } else if(!emailValidator.test(email)) {
+        document.querySelector('#regError').innerHTML = 'Please provide valid email address!';
         return;
     }
 
@@ -81,8 +96,7 @@ const signup = () => {
             } else {
                 document.querySelector('#regError').classList.remove('error');
                 document.querySelector('#regError').innerHTML = res.msg + '<br>';
-                document.querySelector('#regError').innerHTML = 'You can now <a data-toggle="modal" data-target="#signinModal">login</a>';
-
+                document.querySelector('#regForm').reset();
             }
         });
 };
@@ -92,7 +106,7 @@ const isAuthenticated = () => {
 }
 
 const setup = (route) => {
-    const authenticatedRoutes = ['generator', 'validator'];
+    const authenticatedRoutes = ['generator', 'validator', 'instructions', 'create-project', 'manage-projects', 'manage-project-components'];
 
     if(authenticatedRoutes.indexOf(route) !== -1 && !isAuthenticated()) {
         window.location = 'index.html';
@@ -113,6 +127,41 @@ const setup = (route) => {
             .then(res => {
                 document.querySelector('#footer').innerHTML = res;
             });
+
+        if(route === 'manage-projects') {
+            fetch('http://localhost:3000/project/get/user/' + getCookie('uid'))
+                .then(r => r.json())
+                .then(response => {
+                    if(response.status === 'OK') {
+                        const container = document.querySelector('#projects');
+                        for(const project of response.msg.projects) {
+                            let element = '<div class="project-row">';
+                            element += '<div class="cell">' + project.project_name + '</div>';
+                            element += '<div class="cell">' + project.project_sequence + '</div>';
+                            element += '<div class="cell"><a href="manage-project-components.html?pid=' + project._id +'">Manage</a></div>';
+                            element += '</div>';
+                            container.innerHTML += element;
+                        }
+                    }
+                })
+        } else if(route === 'manage-project-components') {
+            let params = window.location.search.substr(1);
+            if(params.length > 1) {
+                params = params.split('&');
+                for(const element of params) {
+                    const param = element.split('=');
+                    if(param[0] === 'pid') {
+                        if(param[1] !== '') {
+                            document.querySelector('#mockContent').innerHTML = 'Fetch that project info';
+                        } else {
+                            document.querySelector('#mockContent').innerHTML = 'Project not found';
+                        }
+                    }
+                }
+            } else {
+                document.querySelector('#mockContent').innerHTML = 'Fetch all projects';
+            }
+        }
     }
 }
 
@@ -242,10 +291,42 @@ function validateSequence() {
             if(response.length === 0) {
                 document.getElementById('code').innerHTML = '\nThe sequence provided is valid!';
             } else {
-                document.getElementById('code').innerHTML = '\nThe sequence provided is invalid!\nPlease look at the following part of the sequence and fix them:';
+                document.getElementById('code').innerHTML = '\nThe sequence provided is invalid!\nPlease look at the following parts of the sequence and fix them:';
                 for(const element of response) {
                     document.getElementById('code').innerHTML += '\n- ' + element;
                 }
             }
+        });
+}
+
+/*
+    PROJECTS
+ */
+
+const createProject = () => {
+    const userId = getCookie('uid');
+    const projectName = document.querySelector('#projectName').value;
+    const sequence = document.querySelector('#sequence').value;
+
+    if(projectName === '' || sequence === '') {
+        document.querySelector('#sequenceError').innerHTML = 'All fields are required!';
+        return;
+    }
+    console.log('http://localhost:3000/project/create/' + userId + '/' + projectName + '/' + sequence);
+    fetch('http://localhost:3000/project/create/' + userId + '/' + projectName + '/' + sequence)
+        .then(r => r.json())
+        .then(response => {
+            console.log(response);
+           if(response.status === 'OK') {
+               document.querySelector('#sequenceError').classList.remove('error');
+               document.querySelector('#sequenceError').innerHTML = response.msg.data + '<br><br>';
+               document.querySelector('#sequenceError').innerHTML += 'You can configure your new project <a href="manage-project-components.html?pid=' + response.msg.project_id + '">here</a>'+ '<br>';
+           } else {
+               document.querySelector('#sequenceError').classList.add('error');
+               document.querySelector('#sequenceError').innerHTML = response.msg.data + '<br><br>';
+               if(response.msg.project_id) {
+                   document.querySelector('#sequenceError').innerHTML += 'You can modify it <a href="manage-project-components.html?pid=' + response.msg.project_id + '">here</a>'+ '<br>';
+               }
+           }
         });
 }

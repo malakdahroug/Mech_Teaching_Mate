@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Mechatronic Teaching Mate - Malak Dahroug</title>
+    <script src="js/functions.js" type="application/javascript"></script>
+    <link href="css/style.css" rel="stylesheet">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <!-- Material Design for Bootstrap fonts and icons -->
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,400,500,700|Material+Icons">
+    <link rel="stylesheet" href="https://fonts.googleapis.com/icon?family=Material+Icons">
+    <!-- Material Design for Bootstrap CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/bootstrap-material-design@4.1.1/dist/css/bootstrap-material-design.min.css" integrity="sha384-wXznGJNEXNG1NFsbm0ugrLFMQPWswR3lds2VeinahP8N0zJw9VWSopbjv2x7WCvX" crossorigin="anonymous">
+</head>
+<body onLoad="setup('instructions');">
+<nav class="navbar navbar-expand-lg navbar-light bg-primary pad20" id="nav"></nav>
+<div id="modals"></div>
+<div class="container content">
+    <div class="row bg-light pad1">
+        <div class="col-lg">
+            <h2 class="page-title">Instructions</h2>
+            <p>This page contain all instructions on how to prepare the sequence for the generation. The sequence has to be satisfying set of rules otherwise the generator / validator might
+            return errors.</p>
+            <h4>Sequence description</h4>
+            <ul>
+                <li>Sequence can contain both lowercase and uppercase letters</li>
+                <li>Sequence can contain actuators marked with A-Z letters</li>
+                <li>Sequence can contain timers written in the following form
+                    <ul>
+                        <li>XS - where X is an integer or floating point number</li>
+                        <li>TS</li>
+                        <li>T+XS - where X is an integer or floating point number</li>
+                    </ul>
+                </li>
+                <li>Sequence can contain repetitive parts indicated with square brackets e.g. [ SEQUENCE TO REPEAT ]^x - where X is an integer number greater than or equal to 2</li>
+                <li>Sequence can contain concurrent parts indicated with round brackets e.g. (concurrent actuations)</li>
+            </ul>
+            <h5>Example of valid sequences</h5>
+            <p>The sequences listed below will get correctly verified by the Mechatronics Teaching Mate. Code and errors currently can be generated only for the simple sequences - the ones that do
+            not include timers, repetitive and concurrent parts.</p>
+            <ul>
+                <li>A+,A-,B+,B-</li>
+                <li>A-,B-,C+,C-,3S,A+,A-</li>
+                <li>C+,B+,TS,A+,B-,C-,A-</li>
+                <li>A+,B-,(A-,B+),(C+,B-),C-</li>
+                <li>A+,(B+,4.2bar),A-,B-</li>
+                <li>A+,(B+,2S),A-,B-</li>
+                <li>[A+,(B+,2S),A-,B-]</li>
+                <li>A+,B-,[A-,B+,C+,B-,C-]^2</li>
+                <li>A+,B-,[(A-,B+),C+,(B-,C-)]^20</li>
+                <li>[A+,B+,C+,D+,[(A-,B-),A+,(A-,B+)]^3,D-,B-]</li>
+                <li>[A+,B+,C+,D+,A-,B-,C-,D-,[(A+,C+),A-,(C-,B+)]^3,D-,B-]</li>
+                <li>[(A+,B+),2S,(A-,B-),[(V+,B+),TS,(V-,B-),V-]^n,A+,[(V+,B+),TS,(V-,B-)]^n+2,A-]</li>
+                <li>[(A+,B-),1S,(A-,B+)]^2,B-,[(A+,V-),TS,(A-,V+)]^n,V+,1S,A+,[(V-,A-),TS,(V+,A+)]^n+1,(V-,A-,B+)</li>
+            </ul>
+            <br>
+            <h5>Examples of invalid sequences</h5>
+            <p>The sequences listed below won't be successfully validated using Mechatronics Teaching Mate validator. Also, the code for the given sequences won't get generated.</p>
+            <ul>
+                <li>A+A-B+B-</li>
+                <li>A-,B-,C+C-,3s,A+,A--</li>
+                <li>C+,B+,s,A+,B-,C-,A-</li>
+                <li>A+,B-,A-,B+),(C+,B-),C-</li>
+                <li>A+,(B+,4.2),A-,B-</li>
+                <li>A+(B+,S),A-,B-</li>
+                <li>[A+,(B+,2SS),A-,B-]</li>
+                <li>A+,B-,[A-,B+,C+,B-,C-]^0.4</li>
+                <li>A+,B-,[(A-,B+),C+,(B-,C-)]20</li>
+                <li>[A+,B+,C+,D+,[(A-,B-),A+,(A-,B+]^3,D-,B-]</li>
+                <li>[A+,B+,C+,D+,A-,B-,C-,D-,[(A+,C+),A-,(C-,B+)^3,D-,B-]</li>
+                <li>[(A+,B+),2s,(A-,B-),[(V+B+),s,(V-,B-,V-]^n,A+-,[(V+,B+),Ts,(V-,B-)]^n+2,A-]</li>
+                <li>[(A+,B-),1s(A-,B+)]^2,B-,[(A+,V-),Ts,(A-,V+]^n,V+,1s,A+,[(V-A-),Ts,(V+A+)]^+1,(V-A-B+)</li>
+            </ul>
+        </div>
+    </div>
+</div>
+<footer class="bg-light text-center text-lg-start" id="footer"></footer>
+<!-- Optional JavaScript -->
+<!-- jQuery first, then Popper.js, then Bootstrap JS -->
+<script src="https://code.jquery.com/jquery-3.2.1.slim.min.js" integrity="sha384-KJ3o2DKtIkvYIK3UENzmM7KCkRr/rE9/Qpg6aAZGJwFDMVNA/GpGFF93hXpG5KkN" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/popper.js@1.12.6/dist/umd/popper.js" integrity="sha384-fA23ZRQ3G/J53mElWqVJEGJzU0sTs+SvzG8fXVWP+kJQ1lwFAOkcUOysnlKJC33U" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/bootstrap-material-design@4.1.1/dist/js/bootstrap-material-design.js" integrity="sha384-CauSuKpEqAFajSpkdjv3z9t8E7RlpJ1UP0lKM/+NdtSarroVKu069AlsRPKkFBz9" crossorigin="anonymous"></script>
+<script>$(document).ready(function() { $('body').bootstrapMaterialDesign(); });</script>
+</body>
+</html>

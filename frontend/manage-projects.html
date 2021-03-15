@@ -11,26 +11,20 @@
     <!-- Material Design for Bootstrap CSS -->
     <link rel="stylesheet" href="https://unpkg.com/bootstrap-material-design@4.1.1/dist/css/bootstrap-material-design.min.css" integrity="sha384-wXznGJNEXNG1NFsbm0ugrLFMQPWswR3lds2VeinahP8N0zJw9VWSopbjv2x7WCvX" crossorigin="anonymous">
 </head>
-<body onLoad="setup('validator');">
+<body onLoad="setup('manage-projects');">
 <nav class="navbar navbar-expand-lg navbar-light bg-primary pad20" id="nav"></nav>
 <div id="modals"></div>
 <div class="container content">
     <div class="row bg-light pad1">
         <div class="col-lg">
-            <h2 class="page-title">Sequence validator</h2>
-            <form class="form-signin text-center">
-                <label for="sequence" class="sr-only">Sequence:</label>
-                <input type="text" id="sequence" class="form-control margin-b-2" placeholder="Sequence">
-
-                <div class="error" id="sequenceError"></div>
-            </form>
-            <div class="text-center">
-                <button class="btn btn-lg btn-primary" onClick="validateSequence();">Validate sequence</button>
+            <h2 class="page-title">Manage projects</h2>
+            <div id="projects">
+                <div class="project-row">
+                    <div class="cell"><b>Project name</b></div>
+                    <div class="cell"><b>Project sequence</b></div>
+                    <div class="cell"><b>Action</b></div>
+                </div>
             </div>
-            <pre id="codeblocks">
-                <code id="code"></code>
-            </pre>
-
         </div>
     </div>
 </div>

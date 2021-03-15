@@ -66,7 +66,7 @@ Not available yet.
     - Break the sequence down - *v. 1.0.0*
     - Implement simple code generation - *v. 1.0.1*
     - Detect type of sequence(simple, concurrent, repetitive or timed) - **v. 1.0.1**
-    - Validate the sequence using regular expressions<sup>1</sup> - **v. 1.0.2b**
+    - Validate the sequence using regular expressions - **v. 1.0.2b**
     - Implement simple mistake generation - **v. 1.0.3a**
 - **Stage 2 - User sessions & projects**  - **CURRENT v. 2.0.2**
     - Implement registration & login system that will be using database to store user data e.g. user projects - **v. 2.0.0**
@@ -102,16 +102,16 @@ Not available yet.
     - Adjust the backend to accommodate for this
 
 ### Frontend
-- **Stage 1 - Website - CURRENT v. 1.0.0**
-    - Create a simple user interface using web technologies - **CURRENT v. 1.0.0**
-    - Incorporate basic sequence validation against regular expression in frontend<sup>1</sup>
-    - Create pages for the following:
-        - login
-        - registration
-        - project operations
-        - sequence generation history
-        - others that will be identified during the development
-    - Improve the general looks of the website to make it more user-friendly
+- **Stage 1 - Website - CURRENT v. 1.0.1**
+    - Create a simple user interface using web technologies - **v. 1.0.0**
+    - ~~Incorporate basic sequence validation against regular expression in frontend~~ - **removed <sup>1</sup>**
+    - Create pages for the following: - **v. 1.0.1**
+        - login - **v. 1.0.1**
+        - registration - **v. 1.0.1**
+        - project operations - **(partial implementation) v. 1.0.1**
+        - sequence generation history - *PENDING expected in v. 1.0.2*
+        - others that will be identified during the development - *PENDING expected in v. 1.0.2*
+    - Improve the general looks of the website to make it more user-friendly - **v. 1.0.1**
 - **Stage 2 - GUI Application**
     - Create a simple user interface using GUI (TBD)
     - Incorporate basic sequence validation against regular expression<sup>1</sup>
@@ -133,8 +133,7 @@ Not available yet.
         - sequence generation history
         - others that will be identified during the development
     - Improve the general looks of the application to make it more user-friendly
-        
-*Double sequence validation using regular expression<sup>1</sup> - sequence is validated both in backend and frontend to improve user experience. It will not create a backend request if the sequence is invalid. It is additionally validated in the backend to ensure code can be generated (in case someone uses unsupported client application or maliciously modifies the code).*
+    
 ### Communication stack
 - **Stage 1 - Communication stacks for the SERVER - PLC communication**
     - Investigate existing PLC communication protocols
@@ -143,7 +142,20 @@ Not available yet.
     - Investigate requirements of the PLC comm stack
     - OPTIONAL: Implement own comm stack if it can address issues discovered in Communication Stack - Stage 1 (if there should be any)
 
-## Changelog
+Double sequence validation <sup>1</sup> - it was identified the sequence validation requires more than regular expression validation only. As a result validation is only done in the backend to keep frontend logics simple.
+## Changelog frontend
+### Version 1.0.1
+- Developed user-friendly, responsive frontend base
+- Added various parts for the frontend including:
+    - User routes (login / registration /logout)
+    - Project routes (create, manage projects, project setting page is still pending)
+    - Generator for sequences that are not created using projects
+    - Validator for sequences - it allows to just validate the sequence and identify errors
+
+### Version 1.0.0
+- Added simple frontend to test the backend routes
+
+## Changelog backend
 ### Version 2.0.2
 - Defined Schemas for Projects and ProjectConfigs to be stored in MongoDB
 - Added backend GET route to fulfill project creation functionality
@@ -173,9 +185,9 @@ Not available yet.
 - isValid function gets tested against 24 valid sequences and 25 invalid sequences. More sequences will be added in the next releases.
 
 ### Version 1.0.2
-- Added sequence validation - the function created in [backend/index.js](/frontend/validate.html) returns an empty array if there are no errors in the sequence, if there are any errors it will return an array containing the list of errors
+- Added sequence validation - the function created in [backend/index.js](/frontend/legacy/validate.html) returns an empty array if there are no errors in the sequence, if there are any errors it will return an array containing the list of errors
 - Added a new backend route that allows to validate the sequence provided as a GET parameter http://localhost:3000/sequence/isValid/(Sequence).
-- Added a frontend page [frontend/validate.html](/frontend/validate.html) which allows to validate the given sequence
+- Added a frontend page [frontend/validate.html](/frontend/legacy/validate.html) which allows to validate the given sequence
 - Sequences that can be validated are concurrent, repeating, simple and timed sequences
 
 ### Version 1.0.1

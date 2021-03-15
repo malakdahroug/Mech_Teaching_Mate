@@ -78,10 +78,10 @@ app.get('/project/create/:id/:name/:sequence', async function(req, res){
     // If sequence provided is valid, add the project to the database and create a ProjectConfig for it
     if(validity) {
         // Describe the new project
-        const newProject = new Project({user_id: req.params.id, project_name: req.params.name, project_sequence: req.params.sequence, validity: validity});
+        const newProject = new Project({user_id: req.params.id, project_name: req.params.name, project_sequence: req.params.sequence.toUpperCase(), validity: validity});
 
         // Try to get records from the database that match the sequence provided and id of the user
-        const project = await Project.find({project_sequence: req.params.sequence, user_id: req.params.id}).exec();
+        const project = await Project.find({project_sequence: req.params.sequence.toUpperCase(), user_id: req.params.id}).exec();
 
         // If user does not have a project fulfilling this sequence add it to the database
         if(project.length === 0) {
@@ -103,6 +103,33 @@ app.get('/project/create/:id/:name/:sequence', async function(req, res){
     } else {
         // If sequence has error do not add it to the database, return an error to the user
         res.send({status: 'Error', msg: {data: 'An error has occurred please fix the sequence!', errors: validator}});
+    }
+});
+
+// Route that handles the single project retrieval
+app.get('/project/get/:project_id', async function(req, res){
+    // Temporary Cross Origin workaround
+    res.header("Access-Control-Allow-Origin", "*");
+    const project = await Project.findOne({_id: req.params.project_id}).exec();
+    const projectConfig = await ProjectConfig.findOne({project_id: req.params.project_id}).exec();
+
+    if(project) {
+        res.send({status: 'OK', msg: {project_data: project, project_config: projectConfig}});
+    } else {
+        res.send({status: 'Error', msg: 'Project with the given ID does not exist!'});
+    }
+});
+
+// Route that handles user projects retrieval
+app.get('/project/get/user/:user_id', async function(req, res){
+    // Temporary Cross Origin workaround
+    res.header("Access-Control-Allow-Origin", "*");
+    const projects = await Project.find({user_id: req.params.user_id}).exec();
+
+    if(projects.length > 0) {
+        res.send({status: 'OK', msg: {projects: projects}});
+    } else {
+        res.send({status: 'Error', msg: 'You do not have any projects!'});
     }
 });
 
@@ -193,7 +220,7 @@ app.post('/user/register', async function (req, res) {
 
     // Retrieve data from the form
     const name = req.body.name; // Name, does not have to be unique
-    const username = req.body.username; // Username, it has to be unique
+    const username = req.body.username.toLowerCase(); // Username, it has to be unique
     const password = req.body.password; // Password, does not have to be unique must be the same as password2
     const password2 = req.body.password2;
     const email = req.body.email; // Email address, it has to be unique
