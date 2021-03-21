@@ -1,0 +1,80 @@
+{
+  "status": "OK",
+  "msg": {
+    "project_data": {
+      "_id": "6057358c3ef03e80bcc7ad68",
+      "user_id": "60461d63918dcd4a5ca93689",
+      "project_name": "Test",
+      "project_sequence": "[(A+,B-),1S,(A-,B+)]^2,B-,[(A+,V-),TS,(A-,V+)]^N,V+,1S,A+,[(V-,A-),TS,(V+,A+)]^N+1,(V-,A-,B+)",
+      "validity": true,
+      "__v": 0
+    },
+    "project_config": {
+      "assigned_elements": [],
+      "_id": "6057358c3ef03e80bcc7ad69",
+      "project_id": "6057358c3ef03e80bcc7ad68",
+      "__v": 0
+    },
+    "components": {
+      "actuator": [
+        "A",
+        "B",
+        "V"
+      ],
+      "timer": [
+        "Timer_1",
+        "Timer_2",
+        "Timer_3",
+        "Timer_4"
+      ],
+      "counter": [
+        "Counter_1",
+        "Counter_2",
+        "Counter_3"
+      ],
+      "pressure": []
+    },
+    "unassignedComponents": [
+      {
+        "type": "actuator",
+        "label": "A"
+      },
+      {
+        "type": "actuator",
+        "label": "B"
+      },
+      {
+        "type": "actuator",
+        "label": "V"
+      },
+      {
+        "type": "timer",
+        "label": "Timer_1"
+      },
+      {
+        "type": "timer",
+        "label": "Timer_2"
+      },
+      {
+        "type": "timer",
+        "label": "Timer_3"
+      },
+      {
+        "type": "timer",
+        "label": "Timer_4"
+      },
+      {
+        "type": "counter",
+        "label": "Counter_1"
+      },
+      {
+        "type": "counter",
+        "label": "Counter_2"
+      },
+      {
+        "type": "counter",
+        "label": "Counter_3"
+      }
+    ]
+  }
+}

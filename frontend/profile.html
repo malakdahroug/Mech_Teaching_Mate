@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Mechatronic Teaching Mate - Malak Dahroug</title>
+    <script src="js/functions.js" type="application/javascript"></script>
+    <link href="css/style.css" rel="stylesheet">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <!-- Material Design for Bootstrap fonts and icons -->
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,400,500,700|Material+Icons">
+    <link rel="stylesheet" href="https://fonts.googleapis.com/icon?family=Material+Icons">
+    <!-- Material Design for Bootstrap CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/bootstrap-material-design@4.1.1/dist/css/bootstrap-material-design.min.css" integrity="sha384-wXznGJNEXNG1NFsbm0ugrLFMQPWswR3lds2VeinahP8N0zJw9VWSopbjv2x7WCvX" crossorigin="anonymous">
+</head>
+<body onLoad="setup('profile');">
+<nav class="navbar navbar-expand-lg navbar-light bg-primary pad20" id="nav"></nav>
+<div id="modals"></div>
+<div class="container content">
+    <div class="row bg-light pad1">
+        <div class="col-lg">
+            <h2 class="page-title">My profile</h2>
+            <form class="form-signin text-center" id="profileForm">
+                <label for="inputNameProfile" class="sr-only">Full name</label>
+                <input type="text" id="inputNameProfile" class="form-control margin-b-2" placeholder="Full name" required autofocus>
+                <label for="inputUsernameProfile" class="sr-only">Username</label>
+                <input type="text" id="inputUsernameProfile" class="form-control margin-b-2" placeholder="Username"  disabled autofocus>
+                <label for="inputEmailProfile" class="sr-only">Email address</label>
+                <input type="email" id="inputEmailProfile" class="form-control margin-b-2" placeholder="Email address" required autofocus>
+                <label for="inputPasswordProfile" class="sr-only">Password</label>
+                <input type="password" id="inputPasswordProfile" class="form-control margin-b-2" placeholder="Password" data-toggle="tooltip" data-placement="left" title="Your password won't be changed if left blank">
+                <label for="inputRepeatPasswordProfile" class="sr-only">Repeat password</label>
+                <input type="password" id="inputRepeatPasswordProfile" class="form-control margin-b-2" placeholder="Repeat password" data-toggle="tooltip" data-placement="left" title="Your password won't be changed if left blank">
+                <div class="error" id="profileError"></div>
+            </form>
+            <button class="btn btn-lg btn-primary btn-block" onClick="updateProfile()">Update</button>
+        </div>
+    </div>
+</div>
+<footer class="bg-light text-center text-lg-start" id="footer"></footer>
+<!-- Optional JavaScript -->
+<!-- jQuery first, then Popper.js, then Bootstrap JS -->
+<script src="https://code.jquery.com/jquery-3.2.1.slim.min.js" integrity="sha384-KJ3o2DKtIkvYIK3UENzmM7KCkRr/rE9/Qpg6aAZGJwFDMVNA/GpGFF93hXpG5KkN" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/popper.js@1.12.6/dist/umd/popper.js" integrity="sha384-fA23ZRQ3G/J53mElWqVJEGJzU0sTs+SvzG8fXVWP+kJQ1lwFAOkcUOysnlKJC33U" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/bootstrap-material-design@4.1.1/dist/js/bootstrap-material-design.js" integrity="sha384-CauSuKpEqAFajSpkdjv3z9t8E7RlpJ1UP0lKM/+NdtSarroVKu069AlsRPKkFBz9" crossorigin="anonymous"></script>
+<script>
+    $(document).ready(function() { $('body').bootstrapMaterialDesign(); });
+    $(function () {
+        $('[data-toggle="tooltip"]').tooltip()
+    })
+</script>
+</body>
+</html>

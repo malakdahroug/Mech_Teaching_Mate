@@ -12,22 +12,37 @@ const cors = require('cors');
 mongoose.connect('mongodb://localhost:27017/teaching-mate', {useNewUrlParser: true, useUnifiedTopology: true});
 
 // Configures express to use body-parser
-app.use(bodyParser.json() );       // to support JSON-encoded bodies
+app.use(bodyParser.json());       // to support JSON-encoded bodies
 app.use(bodyParser.urlencoded({     // to support URL-encoded bodies
     extended: true
 }));
 
 app.use(
     cors({
-        origin: ["http://localhost:63342"]
+        origin: ["http://localhost:63343"]
     })
 );
 app.options("*", cors()); // include before other routes
 
 // DATABASE SCHEMAS START - Schemas for each of the collections used by the application
-const User = mongoose.model('User', { name: String, username: String, email: String, password: String });
-const Project = mongoose.model('Project', { user_id: String, project_name: String, project_sequence: String, validity: Boolean });
-const ProjectConfig = mongoose.model('ProjectConfig', { project_id: String, assigned_elements: Array });
+const User = mongoose.model('User', {name: String, username: String, email: String, password: String});
+const Project = mongoose.model('Project', {
+    user_id: String,
+    project_name: String,
+    project_sequence: String,
+    validity: Boolean
+});
+const ProjectConfig = mongoose.model('ProjectConfig', {project_id: String, assigned_elements: Array});
+const ActuatorConfig = mongoose.model('ActuatorConfig', {
+    project_id: String,
+    label: String,
+    type: String,
+    extTag: String,
+    retTag: String,
+    extSnsTag: String,
+    retSnsTag: String
+});
+
 // DATABASE SCHEMAS END
 
 // // Legacy route for generating the code based on the given sequence
@@ -67,7 +82,7 @@ const ProjectConfig = mongoose.model('ProjectConfig', { project_id: String, assi
 // });
 
 // Route that handles the project creation
-app.get('/project/create/:id/:name/:sequence', async function(req, res){
+app.get('/project/create/:id/:name/:sequence', async function (req, res) {
     // Temporary Cross Origin workaround
     res.header("Access-Control-Allow-Origin", "*");
 
@@ -76,15 +91,23 @@ app.get('/project/create/:id/:name/:sequence', async function(req, res){
     const validity = validator.length === 0;
 
     // If sequence provided is valid, add the project to the database and create a ProjectConfig for it
-    if(validity) {
+    if (validity) {
         // Describe the new project
-        const newProject = new Project({user_id: req.params.id, project_name: req.params.name, project_sequence: req.params.sequence.toUpperCase(), validity: validity});
+        const newProject = new Project({
+            user_id: req.params.id,
+            project_name: req.params.name,
+            project_sequence: req.params.sequence.toUpperCase(),
+            validity: validity
+        });
 
         // Try to get records from the database that match the sequence provided and id of the user
-        const project = await Project.find({project_sequence: req.params.sequence.toUpperCase(), user_id: req.params.id}).exec();
+        const project = await Project.find({
+            project_sequence: req.params.sequence.toUpperCase(),
+            user_id: req.params.id
+        }).exec();
 
         // If user does not have a project fulfilling this sequence add it to the database
-        if(project.length === 0) {
+        if (project.length === 0) {
             // Add new project to the database
             newProject.save().then(() => {
                 // When the project gets successfully created, create an object for the ProjectConfig
@@ -93,12 +116,18 @@ app.get('/project/create/:id/:name/:sequence', async function(req, res){
                 // Add new ProjectConfig to the database
                 newProjectConfig.save().then(() => {
                     // If everything succeeded return message to the frontend informing that project was added
-                    res.send({status: 'OK', msg: {data: 'Project has been created successfully!', project_id: newProject._id}});
+                    res.send({
+                        status: 'OK',
+                        msg: {data: 'Project has been created successfully!', project_id: newProject._id}
+                    });
                 });
             });
         } else {
             // If user has an existing project fulfilling given sequence return an error informing the user that project exists already
-            res.send({status: 'Error', msg: {data: 'You have an existing project for this sequence already!', project_id: project[0]._id}});
+            res.send({
+                status: 'Error',
+                msg: {data: 'You have an existing project for this sequence already!', project_id: project[0]._id}
+            });
         }
     } else {
         // If sequence has error do not add it to the database, return an error to the user
@@ -107,34 +136,94 @@ app.get('/project/create/:id/:name/:sequence', async function(req, res){
 });
 
 // Route that handles the single project retrieval
-app.get('/project/get/:project_id', async function(req, res){
+app.get('/project/get/:project_id', async function (req, res) {
     // Temporary Cross Origin workaround
     res.header("Access-Control-Allow-Origin", "*");
     const project = await Project.findOne({_id: req.params.project_id}).exec();
     const projectConfig = await ProjectConfig.findOne({project_id: req.params.project_id}).exec();
 
-    if(project) {
-        res.send({status: 'OK', msg: {project_data: project, project_config: projectConfig}});
+    const sequence = project.project_sequence.toUpperCase().split(',');
+
+    const components = getComponents(sequence);
+    const unassignedComponents = getUnassignedComponents(components, projectConfig);
+    const assignedComponents = getAssignedComponents(components, projectConfig);
+
+    if (project) {
+        res.send({
+            status: 'OK',
+            msg: {
+                project_data: project,
+                project_config: projectConfig,
+                components: components,
+                unassignedComponents: unassignedComponents,
+                assignedComponents: assignedComponents
+            }
+        });
     } else {
         res.send({status: 'Error', msg: 'Project with the given ID does not exist!'});
     }
 });
 
 // Route that handles user projects retrieval
-app.get('/project/get/user/:user_id', async function(req, res){
+app.get('/project/get/user/:user_id', async function (req, res) {
     // Temporary Cross Origin workaround
     res.header("Access-Control-Allow-Origin", "*");
     const projects = await Project.find({user_id: req.params.user_id}).exec();
 
-    if(projects.length > 0) {
+    if (projects.length > 0) {
         res.send({status: 'OK', msg: {projects: projects}});
     } else {
         res.send({status: 'Error', msg: 'You do not have any projects!'});
     }
 });
 
+app.post('/project/config/add', async function (req, res) {
+    // Temporary Cross Origin workaround
+    res.header("Access-Control-Allow-Origin", "*");
+    const projectID = req.body.pid;
+    const elementLabel = req.body.label;
+    const elementType = req.body.type;
+    const cylinders = ['singleActingSingleTag', 'singleActingDoubleTag', 'doubleActing'];
+
+    const projectConfig = await ProjectConfig.find({project_id: projectID}).exec();
+    if(projectConfig.length === 1) {
+        if (cylinders.includes(elementType)) {
+            let extTag, retTag, extSnsTag, retSnsTag;
+            extTag = req.body.extensionTag;
+            if (elementType !== 'singleActingSingleTag') {
+                retTag = req.body.retractionTag;
+            }
+            extSnsTag = req.body.extSensorTag;
+            retSnsTag = req.body.retSensorTag;
+            let newActuator;
+
+            if(retTag) {
+                newActuator = new ActuatorConfig({project_id: projectID, label: elementLabel, type: elementType, extTag: extTag, retTag: retTag, extSnsTag: extSnsTag, retSnsTag: retSnsTag});
+            } else {
+                newActuator = new ActuatorConfig({project_id: projectID, label: elementLabel, type: elementType, extTag: extTag, retTag: null, extSnsTag: extSnsTag, retSnsTag: retSnsTag});
+            }
+
+            newActuator.save().then(async () => {
+                const elements = projectConfig[0].assigned_elements;
+                elements.push({component_id: newActuator._id, component_type: elementType, component_name: elementLabel});
+                const update = await ProjectConfig.updateOne({project_id: projectID}, {assigned_elements: elements});
+
+                if(update) {
+                    res.send({status: 'OK', msg: 'Configuration has been updated!'});
+                } else {
+                    res.send({status: 'Error', msg: 'An error occurred while updating the component!'});
+                }
+            });
+        }
+    } else {
+        res.send({status: 'Error', msg: 'Project config not found!'});
+    }
+});
+
+
+
 // Sequence validation route
-app.get('/sequence/isValid/:sequence', function(req, res){
+app.get('/sequence/isValid/:sequence', function (req, res) {
     // Temporary Cross Origin workaround
     res.header("Access-Control-Allow-Origin", "*");
     res.setHeader('Content-Type', 'application/json');
@@ -161,7 +250,7 @@ app.get('/sequence/isValid/:sequence', function(req, res){
 });
 
 // New route for generating code with errors
-app.get('/sequence/generate/:sequence/:sensorsPresent/:withFaults', function(req, res){
+app.get('/sequence/generate/:sequence/:sensorsPresent/:withFaults', function (req, res) {
     // Temporary Cross Origin workaround
     res.header("Access-Control-Allow-Origin", "*");
 
@@ -198,16 +287,17 @@ app.get('/sequence/generate/:sequence/:sensorsPresent/:withFaults', function(req
     // Regular expression that detects if sequence includes a timer
     sequenceType += ((req.params.sequence.toUpperCase().search(/([1-9]+[0-9]*S)/) !== -1) ? 1 : 0);
 
-    console.log(sequenceType)
-
     let sequence = req.params.sequence.toUpperCase().split(',');
 
     // If concurrent, repetitive or timed sequence was detected it will return an error informing these types of sequences are not currently supported
-    if(sequenceType !== '000') {
+    if (sequenceType !== '000') {
         res.send({correct: 'Concurrent, repetitive and timed sequences are not currently supported!'});
     } else {
         // Prepare code object - it will contain both correct and incorrect sequences
-        let code = {correct: generateCode(sequence, sequenceQueue, sensors, 0, ''), incorrect: generateCode(sequence, sequenceQueue, sensors, faults, complexity)}
+        let code = {
+            correct: generateCode(sequence, sequenceQueue, sensors, 0, ''),
+            incorrect: generateCode(sequence, sequenceQueue, sensors, faults, complexity)
+        }
         res.send(code); // Sends response to the client
     }
 });
@@ -231,27 +321,32 @@ app.post('/user/register', async function (req, res) {
     const usernameExists = await User.findOne({username: username}).exec() !== null;
 
     // Checks if all form fields have been filled
-    if(name === '' || username === '' || password === '' || password2 === '' || email === '') {
+    if (name === '' || username === '' || password === '' || password2 === '' || email === '') {
         res.send({status: 'Error', msg: 'All form fields are required!'});
-    // Checks if password is not equal to password, if true it will return an error
-    } else if(password !== password2) {
+        // Checks if password is not equal to password, if true it will return an error
+    } else if (password !== password2) {
         res.send({status: 'Error', msg: 'Passwords do not match!'});
-    // Checks if email is already registered in the database, if true it will throw an error
-    } else if(emailExists) {
+        // Checks if email is already registered in the database, if true it will throw an error
+    } else if (emailExists) {
         res.send({status: 'Error', msg: 'User with email provided exists already!'});
-    // Checks if username is already registered in the database, if true it will throw an error
-    } else if(usernameExists) {
+        // Checks if username is already registered in the database, if true it will throw an error
+    } else if (usernameExists) {
         res.send({status: 'Error', msg: 'User with username provided exists already!'});
-    // If no errors were present it will return status OK and add given user to the users collection in MongoDB
+        // If no errors were present it will return status OK and add given user to the users collection in MongoDB
     } else {
-        const newUser = new User({ name: name, username: username.toLowerCase(), email: email.toLowerCase(), password: passwordHash.generate(password)});
+        const newUser = new User({
+            name: name,
+            username: username.toLowerCase(),
+            email: email.toLowerCase(),
+            password: passwordHash.generate(password)
+        });
         newUser.save().then((e) => res.send({status: 'OK', msg: 'User registered successfully!'}));
     }
 });
 
 // POST route that authenticates users (login system). POST was chosen as it is much more secure than GET which adds
 // parameters to the URL rather than sending them in request body.
-app.post('/user/login', async function(req, res) {
+app.post('/user/login', async function (req, res) {
     // Retrieve POST parameters
     const username = req.body.username.toLowerCase(); // Username
 
@@ -261,17 +356,197 @@ app.post('/user/login', async function(req, res) {
     const user = await User.findOne({username: username}).exec();
 
     // If user does not exist return an error
-    if(user === null) {
+    if (user === null) {
         res.send({status: 'Error', msg: 'Username does not exist or password provided is incorrect!'});
-    // If password matches, authenticate the user
-    } else if(passwordHash.verify(password, user.password)) {
+        // If password matches, authenticate the user
+    } else if (passwordHash.verify(password, user.password)) {
         res.send({status: 'OK', msg: 'User authenticated successfully!', details: user._id});
-    // If password does not match, return an error, the same error is returned if username does not exist and if password
-    // does not match as per security recommendations
+        // If password does not match, return an error, the same error is returned if username does not exist and if password
+        // does not match as per security recommendations
     } else {
         res.send({status: 'Error', msg: 'Username does not exist or password provided is incorrect!'});
     }
 });
+
+app.get('/user/get/profile/:uid', async function (req, res) {
+    const userID = req.params.uid;
+
+    const userData = await User.find({_id: userID}).exec();
+
+    if (userData.length >= 1) {
+        res.send({
+            status: 'OK',
+            msg: {
+                _id: userData[0]._id,
+                name: userData[0].name,
+                username: userData[0].username,
+                email: userData[0].email
+            }
+        });
+    } else {
+        res.send({status: 'Error', msg: 'The given user does not exist!'});
+    }
+});
+
+app.post('/user/update/profile', async function (req, res) {
+    const userID = req.body.uid;
+    const name = req.body.name;
+    const email = req.body.email.toLowerCase();
+    const password = req.body.password;
+    const password2 = req.body.password2;
+
+    const userData = await User.find({_id: userID}).exec();
+
+    const userDataVerify = await User.find({email: email, _id: {$ne: userID}}).exec();
+
+    if (userDataVerify.length > 0) {
+        res.send({status: 'Error', msg: 'Email address is being used by someone else!'});
+    } else if (userData.length === 1) {
+        const updatedUser = {name: name, email: email}
+        if (password && password2) {
+            if (password === password2) {
+                updatedUser.password = passwordHash.generate(password);
+            } else {
+                res.send({status: 'Error', msg: 'Passwords provided do not match!'});
+            }
+        }
+        const update = await User.updateOne({_id: userID}, updatedUser);
+
+        if (update) {
+            res.send({status: 'OK', msg: 'Profile has been updated!'});
+        } else {
+            res.send({status: 'OK', msg: 'An internal error occurred! Please try again later!'});
+        }
+    } else {
+        res.send({status: 'Error', msg: 'User does not exist!'});
+    }
+});
+
+function getElementType(element) {
+    const types = {
+        actuator: false,
+        timer: false,
+        counter: false,
+        pressure: false
+    }
+    const actuator = /[A-Z](\+|-)/;
+    const counter = /\]\^(([1-9]+[0-9]+)|([2-9]))|(\]\^N\+[1-9]+[0-9]*)|(\]\^N)|\]/;
+    const timer = /([0-9].[0-9]+|[1-9]+[0-9]*.[0-9]+|[0-9])S|TS/;
+    const pressure = /([0-9].[0-9]+|[1-9]+[0-9]*.[0-9]+|[0-9])BAR/;
+
+    // Tries to match a string to the regular expression provided
+    const matchActuator = element.search(actuator);
+    if (matchActuator !== -1) {
+        types.actuator = true;
+    }
+
+    const matchCounter = element.search(counter);
+    if (matchCounter !== -1) {
+        types.counter = true;
+    }
+
+    const matchTimer = element.search(timer);
+    if (matchTimer !== -1) {
+        types.timer = true;
+    }
+
+    const matchPressure = element.search(pressure);
+    if (matchPressure !== -1) {
+        types.pressure = true;
+    }
+
+    return types;
+}
+
+const getComponents = (sequence) => {
+    const sequenceElements = [];
+
+    for (const element of sequence) {
+        sequenceElements.push({name: element, types: getElementType(element)});
+    }
+
+    const actuators = new Set();
+    const timers = new Set();
+    const counters = new Set();
+    const pressures = new Set();
+    const evaluation = new Set();
+
+    for (const element of sequenceElements) {
+        const evaluatedElement = {name: element.name};
+
+        if (element.types.actuator) {
+            const match = /[A-Z]/;
+            const name = element.name[element.name.search(match)];
+            actuators.add(name);
+            evaluatedElement['actuator'] = name;
+        }
+
+        if (element.types.timer) {
+            timers.add('Timer_' + (timers.size + 1));
+            evaluatedElement['timer'] = 'Timer_' + (timers.size);
+        }
+
+        if (element.types.counter) {
+            counters.add('Counter_' + (counters.size + 1));
+            evaluatedElement['counter'] = 'Counter_' + (counters.size);
+        }
+
+        if (element.types.pressure) {
+            pressures.add('Pressure_' + (pressures.size + 1));
+            evaluatedElement['pressure'] = 'Pressure_' + (pressures.size);
+        }
+
+        evaluation.add(evaluatedElement);
+    }
+
+    return {
+        actuator: Array.from(actuators),
+        timer: Array.from(timers),
+        counter: Array.from(counters),
+        pressure: Array.from(pressures),
+        elements: Array.from(evaluation)
+    }
+}
+
+const getUnassignedComponents = (components, config) => {
+    const unassignedComponents = [];
+
+    const keys = ['actuator', 'timer', 'counter', 'pressure'];
+
+    for (const key of keys) {
+        for (const element of components[key]) {
+            const unassigned = config.assigned_elements.find((e) => {
+                return e.component_name === element;
+            });
+
+            if (!unassigned) {
+                unassignedComponents.push({type: key, label: element});
+            }
+        }
+    }
+
+    return unassignedComponents;
+}
+
+const getAssignedComponents = (components, config) => {
+    const assignedComponents = [];
+
+    const keys = ['actuator', 'timer', 'counter', 'pressure'];
+
+    for (const key of keys) {
+        for (const element of components[key]) {
+            const assigned = config.assigned_elements.find((e) => {
+                return e.component_name === element;
+            });
+
+            if (assigned) {
+                assignedComponents.push({type: key, label: element});
+            }
+        }
+    }
+
+    return assignedComponents;
+}
 
 /**
  * Function that validates if the sequence provided is correct. If there are any errors they will be returned as an array
@@ -308,14 +583,14 @@ function isValid(sequence) {
 
     // Check if sequence starts and ends with [] it means it is a looping sequence - better way has to be found for verification
     // It is just a temporary solution
-    if(sequence[0][0] === '[' && sequence[sequence.length - 1][sequence[sequence.length - 1].length - 1] === ']') {
-        sequence[0] = sequence[0].substring(1,sequence[0].length);
+    if (sequence[0][0] === '[' && sequence[sequence.length - 1][sequence[sequence.length - 1].length - 1] === ']') {
+        sequence[0] = sequence[0].substring(1, sequence[0].length);
         sequence[sequence.length - 1] = sequence[sequence.length - 1].substring(0, sequence[sequence.length - 1].length - 1);
     }
 
     // Iterates through the sequence array and find opening and closing brackets
     // Pushes indexes of opening and closing brackets to the openingBrackets array and closingBrackets array
-    for(let i = 0; i < sequence.length; i++) {
+    for (let i = 0; i < sequence.length; i++) {
 
         // Store current action of the sequence in temp variable - it is because action will be modified to validate against regex
         let temp = sequence[i];
@@ -331,28 +606,28 @@ function isValid(sequence) {
 
         // If opening bracket was found in the current element it pushes its index to the openingBrackets array
         // It then removes it from the temp variable (current action)
-        if(opening !== -1) {
+        if (opening !== -1) {
             openingBrackets.push(i);
             temp = temp.replace(/\(/, '');
         }
 
         // If opening square bracket was found in the current element it pushes its index to the openingRepeating array
         // It then removes it from the temp variable (current action)
-        if(openingSquare !== -1) {
+        if (openingSquare !== -1) {
             openingRepeating.push(i);
             temp = temp.replace(/\[/, '');
         }
 
         // If closing bracket was found in the current element it pushes its index to the closingBrackets array
         // It then removes it from the temp variable (current action)
-        if(closing !== -1) {
+        if (closing !== -1) {
             closingBrackets.push(i);
             temp = temp.replace(/\)/, '');
         }
 
         // If closing of the repeating sequence was found in the current element it pushes its index to the closingRepeating array
         // It then removes it from the temp variable (current action)
-        if(closingSquare !== -1) {
+        if (closingSquare !== -1) {
             closingRepeating.push(i);
             temp = temp.replace(/\]\^(([1-9]+[0-9]+)|([2-9]))|(\]\^N\+[1-9]+[0-9]*)|(\]\^N)|\]/, '');
         }
@@ -362,7 +637,7 @@ function isValid(sequence) {
 
         // Checks if match exists and if the string provided equals to the match returned
         // If it doesn't then the current element will be added to the error set
-        if(match && !(temp === match[0])) {
+        if (match && !(temp === match[0])) {
             errorSet.add(sequence[i]);
         } else if (match === null) {
             errorSet.add(sequence[i]);
@@ -371,19 +646,19 @@ function isValid(sequence) {
 
     // If the amount of closing and opening brackets is the same, carry on with validating the sequence
     // else return an error informing user if there are too many / not enough closing brackets
-    if(openingBrackets.length === closingBrackets.length) {
+    if (openingBrackets.length === closingBrackets.length) {
         // Iterate through both opening and closing brackets arrays
-        for(let i = 0; i < openingBrackets.length; i++) {
+        for (let i = 0; i < openingBrackets.length; i++) {
             // Check if the opening bracket is after the closing bracket
             // If it is add it to the error set
-            if(openingBrackets[i] >= closingBrackets[i]) {
+            if (openingBrackets[i] >= closingBrackets[i]) {
                 errorSet.add(sequence[openingBrackets[i]]);
                 errorSet.add(sequence[closingBrackets[i]]);
-            // Check if it is not last element of openingBrackets
-            // If it is not, check if the closing bracket is before the next opening bracket
-            // If it is not, add it to the error set
-            } else if(i !== openingBrackets.length - 1) {
-                if(closingBrackets[i] >= openingBrackets[i + 1]) {
+                // Check if it is not last element of openingBrackets
+                // If it is not, check if the closing bracket is before the next opening bracket
+                // If it is not, add it to the error set
+            } else if (i !== openingBrackets.length - 1) {
+                if (closingBrackets[i] >= openingBrackets[i + 1]) {
                     errorSet.add(sequence[closingBrackets[i]]);
                     errorSet.add(sequence[openingBrackets[i + 1]]);
                 }
@@ -393,20 +668,20 @@ function isValid(sequence) {
 
     // If the amount of closing and opening brackets for repeating sequence is the same, carry on with validating the sequence
     // else return an error informing user if there are too many / not enough closing square brackets
-    if(openingRepeating.length === closingRepeating.length) {
+    if (openingRepeating.length === closingRepeating.length) {
         // Iterate through both opening and closing brackets arrays for repeating sequence
-        for(let i = 0; i < openingRepeating.length; i++) {
+        for (let i = 0; i < openingRepeating.length; i++) {
             // Check if the opening square bracket is after the closing bracket of the repeating sequence
             // If it is add it to the error set
-            if(openingRepeating[i] >= closingRepeating[i]) {
+            if (openingRepeating[i] >= closingRepeating[i]) {
                 errorSet.add(sequence[openingRepeating[i]]);
                 errorSet.add(sequence[closingRepeating[i]]);
                 console.log(1);
-            // Check if it is not last element of openingRepeating
-            // If it is not, check if the closing of the repeating sequence is before the next opening square bracket
-            // If it is not, add it to the error set
-            } else if(i !== openingRepeating.length - 1) {
-                if(closingRepeating[i] >= openingRepeating[i + 1]) {
+                // Check if it is not last element of openingRepeating
+                // If it is not, check if the closing of the repeating sequence is before the next opening square bracket
+                // If it is not, add it to the error set
+            } else if (i !== openingRepeating.length - 1) {
+                if (closingRepeating[i] >= openingRepeating[i + 1]) {
                     errorSet.add(sequence[closingRepeating[i]]);
                     errorSet.add(sequence[openingRepeating[i + 1]]);
                 }
@@ -418,21 +693,20 @@ function isValid(sequence) {
     // If there are more closing brackets than opening ones, return an error informing user that
     // there are too many closing brackets
     // Otherwise, return an error that one or more of the opening brackets were not closed
-    if(openingRepeating.length < closingRepeating.length) {
+    if (openingRepeating.length < closingRepeating.length) {
         errorSet.add("There are one or more closing bracket for repeating sequence that are missing an opening square bracket");
-    } else if(openingRepeating.length > closingRepeating.length) {
+    } else if (openingRepeating.length > closingRepeating.length) {
         errorSet.add("There is a syntax error in the repeating sequence, it is either missing a closing bracket or no number of repetitions was provided!");
     }
 
     // If there are more closing brackets than opening ones, return an error informing user that
     // there are too many closing brackets
     // Otherwise, return an error that one or more of the opening brackets were not closed
-    if(openingBrackets.length < closingBrackets.length) {
+    if (openingBrackets.length < closingBrackets.length) {
         errorSet.add("There are one or more closing round bracket that are missing an opening round bracket");
-    } else if(openingBrackets.length > closingBrackets.length) {
+    } else if (openingBrackets.length > closingBrackets.length) {
         errorSet.add("One or more of the opening round brackets are not closed!");
     }
-
 
 
     // Return all the errors in array form or empty array if there are no errors present
@@ -451,7 +725,7 @@ function isValid(sequence) {
  */
 function generateCode(sequence, q, sensors, faults, complexity) {
     // Add all elements from the sequence array to the Queue
-    for(const element of sequence) {
+    for (const element of sequence) {
         q.enqueue(element);
     }
 
@@ -481,19 +755,19 @@ function generateCode(sequence, q, sensors, faults, complexity) {
     let actionCount = 0;
 
     // Keeps iterating until the queue is fully emptied
-    while(!q.isEmpty()) {
+    while (!q.isEmpty()) {
         // Empty the first element in the queue and assign it to element variable
         const element = q.dequeue();
         actionCount++;
-        if(element.length !== 2) {
+        if (element.length !== 2) {
             invalid = true;
             invalidElements.push(element);
-        // If element is correct i.e. matches the regular expression given
-        } else if(element.match(validator)) {
+            // If element is correct i.e. matches the regular expression given
+        } else if (element.match(validator)) {
 
             // Checks if actuator is an actuator set, if it's not it's going to add it to the set
             // and add it's setup action (for now cylinder retracted) to the setup code
-            if(!actuators.has(element[0])) {
+            if (!actuators.has(element[0])) {
                 actuators.add(element[0]); // Add to set
                 setupCode.push('        Cylinder_' + element[0] + '_Extend := FALSE;'); // Retract cylinder
                 setupCode.push('        Cylinder_' + element[0] + '_Retract := TRUE;'); // Retract cylinder
@@ -506,9 +780,9 @@ function generateCode(sequence, q, sensors, faults, complexity) {
             currentCase += 10;
 
             // Checks if it is extension
-            if(element[1] === '+') {
+            if (element[1] === '+') {
                 // Add extension actuation to the logicCode
-                if(sensors) {
+                if (sensors) {
                     logicCode.push('        IF "Cylinder_' + element[0] + '_Ret_Sensor" THEN');
                     logicCode.push('            Cylinder_' + element[0] + '_Extend := TRUE;'); // Extend cylinder
                     logicCode.push('            Cylinder_' + element[0] + '_Retract := FALSE;'); // Extend cylinder
@@ -519,10 +793,10 @@ function generateCode(sequence, q, sensors, faults, complexity) {
                     logicCode.push('        Cylinder_' + element[0] + '_Retract := FALSE;'); // Extend cylinder
                     logicCode.push('        #NEXT := ' + currentCase + ';<br>'); // Move to the next case
                 }
-            // Checks if it is retraction
-            } else if(element[1] === '-') {
+                // Checks if it is retraction
+            } else if (element[1] === '-') {
                 // Add retraction actuation to the logicCode
-                if(sensors) {
+                if (sensors) {
                     logicCode.push('        IF "Cylinder_' + element[0] + '_Ext_Sensor" THEN');
                     logicCode.push('            Cylinder_' + element[0] + '_Extend := FALSE;'); // Retract cylinder
                     logicCode.push('            Cylinder_' + element[0] + '_Retract := TRUE;'); // Retract cylinder
@@ -535,9 +809,9 @@ function generateCode(sequence, q, sensors, faults, complexity) {
                 }
             }
 
-        // If current element in the queue is not a valid expression, it will set invalid to true
-        // it will also add the invalid elements in the sequence to the invalidArray, which later on will be
-        // displayed to the user
+            // If current element in the queue is not a valid expression, it will set invalid to true
+            // it will also add the invalid elements in the sequence to the invalidArray, which later on will be
+            // displayed to the user
         } else {
             invalid = true;
             invalidElements.push(element);
@@ -545,7 +819,7 @@ function generateCode(sequence, q, sensors, faults, complexity) {
     }
 
     // If invalid element was detected, it will return the message with invalid elements in the sequence
-    if(invalid) {
+    if (invalid) {
         return 'The sequence provided is invalid, please check the following part of the sequence "' + invalidElements + '"!';
     }
 
@@ -555,15 +829,15 @@ function generateCode(sequence, q, sensors, faults, complexity) {
     // If sensors are used then it removes second to last element from logicCode array
     // It will remove #NEXT := case jump as there's no next case (second to last element)
     // If sensors are not used it will also remove #NEXT := case jump by removing the last element from logicCode array
-    if(sensors) {
-        logicCode.splice(logicCode.length-2, 1);
+    if (sensors) {
+        logicCode.splice(logicCode.length - 2, 1);
     } else {
-        logicCode.splice(logicCode.length-1, 1);
+        logicCode.splice(logicCode.length - 1, 1);
     }
 
     // After code is generated, the function checks if faults parameter is set to true
     // If it is it will modify logic code to generate some errors
-    if(faults) {
+    if (faults) {
 
         // Setting initial value of faultsLimit to 0, it will be amended depending on complexity chosen
         // Using a formulae from the next set of if - else-if statements
@@ -571,39 +845,39 @@ function generateCode(sequence, q, sensors, faults, complexity) {
 
         // Current number of errors generated
         let faultsCount = 0;
-        if(complexity === 'easy') {
-            faultsLimit = Math.ceil(logicCode.length/5);
-        } else if(complexity === 'medium') {
-            faultsLimit = Math.ceil(logicCode.length/4);
-        } else if(complexity === 'hard') {
-            faultsLimit = Math.ceil(logicCode.length/3);
+        if (complexity === 'easy') {
+            faultsLimit = Math.ceil(logicCode.length / 5);
+        } else if (complexity === 'medium') {
+            faultsLimit = Math.ceil(logicCode.length / 4);
+        } else if (complexity === 'hard') {
+            faultsLimit = Math.ceil(logicCode.length / 3);
         }
 
         // If number of generated faults is less than a limit - it will keep repeating until it generates enough errors
-        while(faultsCount < faultsLimit) {
+        while (faultsCount < faultsLimit) {
 
             // It will keep iterating through logicCode array
-            for(let i = 0; i < logicCode.length; i++) {
+            for (let i = 0; i < logicCode.length; i++) {
 
                 // Checks if enough faults were generated already, if so - it will break the loop as well as condition
                 // of the while loop won't be satisfied anymore
-                if(faultsCount >= faultsLimit) {
+                if (faultsCount >= faultsLimit) {
                     break;
                 }
 
                 // Generates a pseudo random number between 0 and 10,
                 // if the number is smaller than 3 (which maps to roughly 30% chances of error being generated in that line)
                 // it will then generate an error
-                if(Math.floor(Math.random() * 10) < 3) {
+                if (Math.floor(Math.random() * 10) < 3) {
                     // Generates a random number between 0 and 2 to decide which type of fault to include
                     // - 0 -> will shift line of code 2 lines forward (for the last 3 lines it will shift them 2 lines backward)
                     // - 1 -> it will remove up to 3 characters from the end of the string
                     // - 2 -> it will completely remove the line of code
                     let faultOption = Math.floor(Math.random() * 3);
-                    switch(faultOption) {
+                    switch (faultOption) {
                         case 0:
                             let currentElement = logicCode[i];
-                            if(i >= logicCode.length - 3) {
+                            if (i >= logicCode.length - 3) {
                                 logicCode[i] = logicCode[i - 2];
                                 logicCode[i - 2] = currentElement;
                             } else {
@@ -612,7 +886,7 @@ function generateCode(sequence, q, sensors, faults, complexity) {
                             }
                             break;
                         case 1:
-                            logicCode[i] = logicCode[i].substring(0, logicCode[i].length - Math.ceil(Math.random()*3));
+                            logicCode[i] = logicCode[i].substring(0, logicCode[i].length - Math.ceil(Math.random() * 3));
                             break;
                         case 2:
                             logicCode.splice(i, 1);

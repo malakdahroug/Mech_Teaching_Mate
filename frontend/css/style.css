@@ -92,6 +92,43 @@ footer {
     text-align: center;
 }
 
+#myProjects {
+    text-align: center;
+    width: 80%;
+    margin: 0 auto;
+}
+
+#myProjects hr {
+    width: 80%;
+    margin: 2rem auto;
+}
+
+#myProjects label {
+    margin: 0 auto;
+}
+
+#myProjects div {
+    margin-bottom: 1rem;
+}
+
+#sequenceModalContainer {
+    max-width: 45vw;
+}
+
+.elementIdentifier {
+    min-width: 10%;
+    display: inline-block;
+    margin: 0.25rem;
+    font-weight: bold;
+}
+
+.elementDescription {
+    min-width: 70%;
+    margin: 0.25rem;
+    display: inline-block;
+}
+
+
 @media (max-width: 767px) {
     #codeblocks {
         flex-direction: column;
@@ -108,5 +145,15 @@ footer {
         width: 100%;
         padding: 0.5rem;
         margin: 0.5rem;
+    }
+
+    #sequenceModalContainer {
+        max-width: 90vw;
+    }
+}
+
+@media (max-width: 1400px) {
+    #sequenceModalContainer {
+        max-width: 70vw;
     }
 }
