@@ -313,7 +313,6 @@ const generate = () => {
     fetch(backend + '/sequence/generate/' + document.getElementById('sequence').value + '/' + checkbox + '/' + errors)
         .then(o => o.json())
         .then(response => {
-            console.log(response);
             let correct, incorrect;
             if (screen.width < 768) {
                 correct = response.correct.toString().replaceAll('    ', ' ');
@@ -365,7 +364,6 @@ function validateSequence() {
     fetch(backend + '/sequence/isValid/' + document.getElementById('sequence').value)
         .then(o => o.json())
         .then(response => {
-            console.log(response);
             if (response.length === 0) {
                 document.getElementById('code').innerHTML = '\nThe sequence provided is valid!';
             } else {
@@ -390,11 +388,9 @@ const createProject = () => {
         document.querySelector('#sequenceError').innerHTML = 'All fields are required!';
         return;
     }
-    console.log(backend + '/project/create/' + userId + '/' + projectName + '/' + sequence);
     fetch(backend + '/project/create/' + userId + '/' + projectName + '/' + sequence)
         .then(r => r.json())
         .then(response => {
-            console.log(response);
             if (response.status === 'OK') {
                 document.querySelector('#sequenceError').classList.remove('error');
                 document.querySelector('#sequenceError').innerHTML = response.msg.data + '<br><br>';
@@ -414,41 +410,43 @@ const editProject = () => {
     window.location = 'manage-project-components.html?pid=' + project;
 }
 
+let projectSettings = {};
+
 const fetchProject = (pid) => {
     const container = document.querySelector('#myProjects');
     container.innerHTML = '';
     fetch(backend + '/project/get/' + pid)
         .then(r => r.json())
         .then(response => {
-            let content = '';
-            let contentAssigned = '';
-            console.log(response);
-            container.innerHTML = '<h6>' + response.msg.project_data.project_sequence.replaceAll(',', ', ') +'</h6><br>' +
-                '<a class="dropdown-item" href="#" data-toggle="modal" data-target="#sequenceModal" id="seqModal">How sequence got evaluated</a><hr>';
+            if (response.status === 'OK') {
+                let content = '';
+                let contentAssigned = '';
+                container.innerHTML = '<h6>' + response.msg.project_data.project_sequence.replaceAll(',', ', ') +'</h6><br>' +
+                    '<a class="dropdown-item" href="#" data-toggle="modal" data-target="#sequenceModal" id="seqModal">How sequence got evaluated</a><hr>';
+                container.innerHTML += '<label for="existingComponents">Assigned components</label><select id="existingComponents" class="form-control"></select>' +
+                    '<button class="btn btn-lg btn-primary half-width" onClick="viewConfig(\'' + pid +'\')" data-toggle="modal" data-target="#componentModal">View configuration</button>' +
+                    '<button class="btn btn-lg btn-primary half-width" onClick="deleteConfig(\'' + pid +'\')">Delete configuration</button><hr>' +
+                    '<label for="components">Unassigned components</label><select id="components" class="form-control"></select>';
 
-            container.innerHTML += '<label for="existingComponents">Assigned components</label><select id="existingComponents" class="form-control"></select>' +
-                '<button class="btn btn-lg btn-primary btn-block" onClick="modifyConfig(\'' + pid +'\')">Modify component configuration</button><hr>' +
-                '<label for="components">Unassigned components</label><select id="components" class="form-control"></select>';
+                const modalBody = document.querySelector('#sequenceModalBody');
+                projectSettings = response.msg.components.elements;
+                for(let i = 0; i < response.msg.components.elements.length; i++) {
+                    const element = response.msg.components.elements[i];
 
-            const modalBody = document.querySelector('#sequenceModalBody');
-            for(let i = 0; i < response.msg.components.elements.length; i++) {
-                const element = response.msg.components.elements[i];
+                    let sequenceElement = '<div class="elementIdentifier">"' + element.name + '"</div><div class="elementDescription">Assigned with the following types and identifiers: <i>'
+                    const keys = ['actuator', 'timer', 'counter', 'pressure'];
 
-                let sequenceElement = '<div class="elementIdentifier">"' + element.name + '"</div><div class="elementDescription">Assigned with the following types and identifiers: <i>'
-                const keys = ['actuator', 'timer', 'counter', 'pressure'];
-
-                for(const key of keys) {
-                    if(element[key]) {
-                        sequenceElement += key + ' (' + element[key] +'), ';
+                    for(const key of keys) {
+                        if(element[key]) {
+                            sequenceElement += key + ' (' + element[key] +'), ';
+                        }
                     }
+
+                    sequenceElement = sequenceElement.substr(0, sequenceElement.length - 2) + '</i>';
+
+                    modalBody.innerHTML += sequenceElement+'</div><br>';
                 }
 
-                sequenceElement = sequenceElement.substr(0, sequenceElement.length - 2) + '</i>';
-
-                modalBody.innerHTML += sequenceElement+'</div><br>';
-            }
-
-            if (response.status === 'OK') {
                 for (const element of response.msg.unassignedComponents) {
                     content += '<option value="' + element.type + '_' + element.label + '">' + element.label + ' (' + element.type + ')</option>';
                 }
@@ -474,33 +472,87 @@ const fetchProject = (pid) => {
 const addConfig = (pid) => {
     const selected = document.querySelector('#components').value.split('_');
     const options = document.querySelector('#options');
-
     if (selected[0] === 'actuator') {
         options.innerHTML = '';
         displayCylinderOptions(selected[1], pid);
     } else if (selected[0] === 'timer') {
-        options.innerHTML = 'Here will be fields for timer';
+        displayTimerOptions(selected[1] + '_' + selected[2], pid);
     } else if (selected[0] === 'counter') {
-        options.innerHTML = 'Here will be fields for counter';
+        displayCounterOptions(selected[1] + '_' + selected[2], pid);
     } else if (selected[0] === 'pressure') {
         options.innerHTML = 'Here will be fields for pressure sensor';
     }
 }
 
-const modifyConfig = (pid) => {
-    const selected = document.querySelector('#existingComponents').value.split('_');
+const deleteConfig = (pid) => {
+    const component = document.querySelector('#existingComponents').value;
+    fetch(backend + '/project/config/delete', {
+        method: 'post',
+        headers: {
+            'Accept': 'application/json, text/plain, */*',
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({pid: pid, component: component})
+    }).then(res => res.json())
+        .then(res => {
+            if(res.status === 'OK') {
+                location.reload();
+            } else {
+                document.querySelector('#componentError').innerHTML = res.msg;
+            }
+        });
+}
 
-    console.log('Modifying...');
+const viewConfig = (pid) => {
+    const component = document.querySelector('#existingComponents').value;
 
-    if (selected[0] === 'actuator') {
-        displayCylinderEditOptions(selected[1], pid);
-    } else if (selected[0] === 'timer') {
-        options.innerHTML = 'Here will be fields for timer';
-    } else if (selected[0] === 'counter') {
-        options.innerHTML = 'Here will be fields for counter';
-    } else if (selected[0] === 'pressure') {
-        options.innerHTML = 'Here will be fields for pressure sensor';
-    }
+    fetch(backend + '/project/config/get', {
+        method: 'post',
+        headers: {
+            'Accept': 'application/json, text/plain, */*',
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({pid: pid, component: component})
+    }).then(res => res.json())
+        .then(res => {
+            if(res.status === 'OK') {
+                const modalBody = document.querySelector('#componentModalBody');
+                modalBody.classList.remove('error');
+                let response = '';
+                const data = res.msg[0];
+                const type = res.msg[0].label.split('_')[0];
+                if(type === 'Timer') {
+                    response += '<b>Type:</b> Timer<br>';
+                    response += '<b>Reset tag:</b> ' + data.resetTag + '<br>';
+                    response += '<b>Timer completed tag:</b> ' + data.completedTag + '<br>';
+                } else if(type === 'Counter') {
+                    response += '<b>Type:</b> Counter<br>';
+                    response += '<b>Reset tag:</b> ' + data.resetTag + '<br>';
+                    response += '<b>Timer completed tag:</b> ' + data.completedTag + '<br>';
+                    response += '<b>Current counter value tag:</b> ' + data.currentValueTag + '<br>';
+                } else {
+                    if(data.type === 'singleActingSingleTag') {
+                        response += '<b>Type:</b> Single acting cylinder controlled with one tag <br>';
+                        response += '<b>Extension tag:</b> ' + data.extTag + '<br>';
+                    } else if(data.type === 'singleActingDoubleTag') {
+                        response += '<b>Type:</b> Single acting cylinder controlled with two tags';
+                        response += '<b>Extension tag:</b> ' + data.extTag + '<br>';
+                        response += '<b>Retraction tag:</b> ' + data.retTag + '<br>';
+
+                    } else {
+                        response += '<b>Type:</b> Double acting cylinder<br>';
+                        response += '<b>Extension </b> ' + data.extTag + '<br>';
+                        response += '<b>Retraction tag:</b> ' + data.retTag + '<br>';
+                    }
+                    response += '<b>Extended sensor:</b> ' + data.extSnsTag + '<br>';
+                    response += '<b>Retracted sensor:</b> ' + data.retSnsTag + '<br>';
+                }
+                modalBody.innerHTML = response;
+            } else {
+                document.querySelector('#componentModalBody').innerHTML = res.msg;
+                document.querySelector('#componentModalBody').classList.add('error');
+            }
+        });
 }
 
 const displayCylinderOptions = (label, pid) => {
@@ -527,12 +579,12 @@ const displayCylinderOptions = (label, pid) => {
         '</div>';
     const retractionTag = '<div id="retTag">' +
         '<label for="tag2">Retraction tag</label>' +
-        '<input type="text" id="tag2" class="form-control" placeholder="Tag name" required autofocus>' +
+        '<input type="text" id="tag2" class="form-control" placeholder="Tag name" required>' +
         '</div>';
     const sensors = '<label for="sensorTag1">Retracted sensor</label>' +
-        '<input type="text" id="sensorTag1" class="form-control" placeholder="Tag name" required autofocus>' +
+        '<input type="text" id="sensorTag1" class="form-control" placeholder="Tag name" required>' +
         '<label for="sensorTag2">Extended sensor</label>' +
-        '<input type="text" id="sensorTag2" class="form-control" placeholder="Tag name" required autofocus><div class="error" id="componentError"></div>';
+        '<input type="text" id="sensorTag2" class="form-control" placeholder="Tag name" required>';
 
     options.innerHTML += cylinderType;
 
@@ -552,7 +604,6 @@ const displayCylinderOptions = (label, pid) => {
                 detailedOptions.innerHTML += tagCount;
             }
             document.querySelector('#tagCount').addEventListener('change', (e) => {
-                console.log('change');
                 if (e.target.value === 'no') {
                     if (!document.querySelector('#extTag')) {
                         tagSettings.innerHTML += extensionTag;
@@ -594,6 +645,45 @@ const displayCylinderOptions = (label, pid) => {
     });
 }
 
+const displayTimerOptions = (label, pid) => {
+    const options = document.querySelector('#options');
+    const btnContainer = document.querySelector('#btnContainer');
+    options.innerHTML = '';
+    const resetTag = '<div id="resetTagContainer">' +
+        '<label for="resetTag">Reset tag</label>' +
+        '<input type="text" id="resetTag" class="form-control" placeholder="Tag name" required autofocus>' +
+        '</div>';
+    const completedTag = '<div id="resetTagContainer">' +
+        '<label for="completedTag">Timer completed tag</label>' +
+        '<input type="text" id="completedTag" class="form-control" placeholder="Tag name" required>' +
+        '</div>';
+    options.innerHTML += resetTag;
+    options.innerHTML += completedTag;
+    btnContainer.innerHTML = '<button class="btn btn-lg btn-primary btn-block" onClick="submitTimerConfig(\'' + label +'\', \'' + pid +'\')">Submit configuration</button>'
+}
+
+const displayCounterOptions = (label, pid) => {
+    const options = document.querySelector('#options');
+    const btnContainer = document.querySelector('#btnContainer');
+    options.innerHTML = '';
+    const resetTag = '<div id="resetTagContainer">' +
+        '<label for="resetTag">Reset tag</label>' +
+        '<input type="text" id="resetTag" class="form-control" placeholder="Tag name" required autofocus>' +
+        '</div>';
+    const completedTag = '<div id="resetTagContainer">' +
+        '<label for="completedTag">Counter completed tag</label>' +
+        '<input type="text" id="completedTag" class="form-control" placeholder="Tag name" required>' +
+        '</div>';
+    const currentValueTag = '<div id="resetTagContainer">' +
+        '<label for="currentValueTag">Current counter value tag</label>' +
+        '<input type="text" id="currentValueTag" class="form-control" placeholder="Tag name" required>' +
+        '</div>';
+    options.innerHTML += resetTag;
+    options.innerHTML += completedTag;
+    options.innerHTML += currentValueTag;
+    btnContainer.innerHTML = '<button class="btn btn-lg btn-primary btn-block" onClick="submitCounterConfig(\'' + label +'\', \'' + pid +'\')">Submit configuration</button>'
+}
+
 const submitCylinderConfig = (type, label, pid) => {
     const cylinderConfiguration = {};
     cylinderConfiguration.pid = pid;
@@ -607,7 +697,10 @@ const submitCylinderConfig = (type, label, pid) => {
     cylinderConfiguration.extSensorTag = document.querySelector('#sensorTag2').value;
     cylinderConfiguration.retSensorTag = document.querySelector('#sensorTag1').value;
 
-    if(cylinderConfiguration.pid && cylinderConfiguration.type && cylinderConfiguration.label && cylinderConfiguration.extensionTag && cylinderConfiguration.retractionTag && cylinderConfiguration.extSensorTag && cylinderConfiguration.retSensorTag) {
+
+    const conditionSingle = cylinderConfiguration.pid && cylinderConfiguration.type === 'singleActingSingleTag'  && cylinderConfiguration.label && cylinderConfiguration.extensionTag && cylinderConfiguration.extSensorTag && cylinderConfiguration.retSensorTag;
+    const conditionDouble = (cylinderConfiguration.type === 'singleActingDoubleTag' || cylinderConfiguration.type === 'doubleActing') && (cylinderConfiguration.pid && cylinderConfiguration.label && cylinderConfiguration.extensionTag && cylinderConfiguration.retractionTag && cylinderConfiguration.extSensorTag && cylinderConfiguration.retSensorTag);
+    if(conditionSingle || conditionDouble) {
         fetch(backend + '/project/config/add', {
             method: 'post',
             headers: {
@@ -628,6 +721,57 @@ const submitCylinderConfig = (type, label, pid) => {
     }
 }
 
-const displayCylinderEditOptions = (label, pid) => {
-    console.log(label, pid);
+const submitTimerConfig = (label, pid) => {
+    const timerConfiguration = {};
+    timerConfiguration.pid = pid;
+    timerConfiguration.type = 'timer';
+    timerConfiguration.label = label;
+    timerConfiguration.resetTag = document.querySelector('#resetTag').value;
+    timerConfiguration.completedTag = document.querySelector('#completedTag').value;
+
+    if(timerConfiguration.pid && timerConfiguration.label && timerConfiguration.resetTag && timerConfiguration.completedTag) {
+        fetch(backend + '/project/config/add', {
+            method: 'post',
+            headers: {
+                'Accept': 'application/json, text/plain, */*',
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(timerConfiguration)
+        }).then(res => res.json())
+            .then(res => {
+                if(res.status === 'OK') {
+                    location.reload();
+                } else {
+                    document.querySelector('#componentError').innerHTML = res.msg;
+                }
+            });
+    }
+}
+
+const submitCounterConfig = (label, pid) => {
+    const counterConfiguration = {};
+    counterConfiguration.pid = pid;
+    counterConfiguration.type = 'counter';
+    counterConfiguration.label = label;
+    counterConfiguration.resetTag = document.querySelector('#resetTag').value;
+    counterConfiguration.completedTag = document.querySelector('#completedTag').value;
+    counterConfiguration.currentValueTag = document.querySelector('#currentValueTag').value;
+
+    if(counterConfiguration.pid && counterConfiguration.label && counterConfiguration.resetTag && counterConfiguration.completedTag && counterConfiguration.currentValueTag) {
+        fetch(backend + '/project/config/add', {
+            method: 'post',
+            headers: {
+                'Accept': 'application/json, text/plain, */*',
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(counterConfiguration)
+        }).then(res => res.json())
+            .then(res => {
+                if(res.status === 'OK') {
+                    location.reload();
+                } else {
+                    document.querySelector('#componentError').innerHTML = res.msg;
+                }
+            });
+    }
 }

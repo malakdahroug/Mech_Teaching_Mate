@@ -19,7 +19,7 @@ app.use(bodyParser.urlencoded({     // to support URL-encoded bodies
 
 app.use(
     cors({
-        origin: ["http://localhost:63343"]
+        origin: ["http://localhost:63342"]
     })
 );
 app.options("*", cors()); // include before other routes
@@ -41,6 +41,19 @@ const ActuatorConfig = mongoose.model('ActuatorConfig', {
     retTag: String,
     extSnsTag: String,
     retSnsTag: String
+});
+const TimerConfig = mongoose.model('TimerConfig', {
+    project_id: String,
+    label: String,
+    resetTag: String,
+    completedTag: String
+});
+const CounterConfig = mongoose.model('CounterConfig', {
+    project_id: String,
+    label: String,
+    resetTag: String,
+    completedTag: String,
+    currentValueTag: String
 });
 
 // DATABASE SCHEMAS END
@@ -186,7 +199,7 @@ app.post('/project/config/add', async function (req, res) {
     const cylinders = ['singleActingSingleTag', 'singleActingDoubleTag', 'doubleActing'];
 
     const projectConfig = await ProjectConfig.find({project_id: projectID}).exec();
-    if(projectConfig.length === 1) {
+    if (projectConfig.length === 1) {
         if (cylinders.includes(elementType)) {
             let extTag, retTag, extSnsTag, retSnsTag;
             extTag = req.body.extensionTag;
@@ -197,18 +210,85 @@ app.post('/project/config/add', async function (req, res) {
             retSnsTag = req.body.retSensorTag;
             let newActuator;
 
-            if(retTag) {
-                newActuator = new ActuatorConfig({project_id: projectID, label: elementLabel, type: elementType, extTag: extTag, retTag: retTag, extSnsTag: extSnsTag, retSnsTag: retSnsTag});
+            if (retTag) {
+                newActuator = new ActuatorConfig({
+                    project_id: projectID,
+                    label: elementLabel,
+                    type: elementType,
+                    extTag: extTag,
+                    retTag: retTag,
+                    extSnsTag: extSnsTag,
+                    retSnsTag: retSnsTag
+                });
             } else {
-                newActuator = new ActuatorConfig({project_id: projectID, label: elementLabel, type: elementType, extTag: extTag, retTag: null, extSnsTag: extSnsTag, retSnsTag: retSnsTag});
+                newActuator = new ActuatorConfig({
+                    project_id: projectID,
+                    label: elementLabel,
+                    type: elementType,
+                    extTag: extTag,
+                    retTag: null,
+                    extSnsTag: extSnsTag,
+                    retSnsTag: retSnsTag
+                });
             }
 
             newActuator.save().then(async () => {
                 const elements = projectConfig[0].assigned_elements;
-                elements.push({component_id: newActuator._id, component_type: elementType, component_name: elementLabel});
+                elements.push({
+                    component_id: newActuator._id,
+                    component_type: elementType,
+                    component_name: elementLabel
+                });
                 const update = await ProjectConfig.updateOne({project_id: projectID}, {assigned_elements: elements});
 
-                if(update) {
+                if (update) {
+                    res.send({status: 'OK', msg: 'Configuration has been updated!'});
+                } else {
+                    res.send({status: 'Error', msg: 'An error occurred while updating the component!'});
+                }
+            });
+        } else if (elementType === 'timer') {
+            const newTimer = new TimerConfig({
+                project_id: projectID,
+                label: elementLabel,
+                resetTag: req.body.resetTag,
+                completedTag: req.body.completedTag
+            });
+
+            newTimer.save().then(async () => {
+                const elements = projectConfig[0].assigned_elements;
+                elements.push({
+                    component_id: newTimer._id,
+                    component_type: elementType,
+                    component_name: elementLabel
+                });
+                const update = await ProjectConfig.updateOne({project_id: projectID}, {assigned_elements: elements});
+
+                if (update) {
+                    res.send({status: 'OK', msg: 'Configuration has been updated!'});
+                } else {
+                    res.send({status: 'Error', msg: 'An error occurred while updating the component!'});
+                }
+            });
+        } else if (elementType === 'counter') {
+            const newCounter = new CounterConfig({
+                project_id: projectID,
+                label: elementLabel,
+                resetTag: req.body.resetTag,
+                completedTag: req.body.completedTag,
+                currentValueTag: req.body.currentValueTag
+            });
+
+            newCounter.save().then(async () => {
+                const elements = projectConfig[0].assigned_elements;
+                elements.push({
+                    component_id: newCounter._id,
+                    component_type: elementType,
+                    component_name: elementLabel
+                });
+                const update = await ProjectConfig.updateOne({project_id: projectID}, {assigned_elements: elements});
+
+                if (update) {
                     res.send({status: 'OK', msg: 'Configuration has been updated!'});
                 } else {
                     res.send({status: 'Error', msg: 'An error occurred while updating the component!'});
@@ -220,6 +300,117 @@ app.post('/project/config/add', async function (req, res) {
     }
 });
 
+app.post('/project/config/delete', async function (req, res) {
+    // Temporary Cross Origin workaround
+    res.header("Access-Control-Allow-Origin", "*");
+    const projectID = req.body.pid;
+    const component = req.body.component;
+    const componentElements = component.split('_');
+    const type = componentElements[0];
+    let label = '';
+    if(componentElements[2]) {
+        label = componentElements[1] + '_' + componentElements[2];
+    } else {
+        label = componentElements[1];
+    }
+
+    const projectConfig = await ProjectConfig.find({project_id: projectID}).exec();
+    if (projectConfig.length === 1) {
+        let collection;
+
+        switch(type) {
+            case 'actuator':
+                collection = ActuatorConfig;
+                break;
+            case 'timer':
+                collection = TimerConfig;
+                break;
+            case 'counter':
+                collection = CounterConfig;
+                break;
+        }
+
+        if(collection) {
+            const element = await collection.find({label: label, project_id: projectID}).exec();
+
+            if(element.length > 0) {
+                const result = await collection.deleteMany({label: label, project_id: projectID});
+
+                if(result) {
+                    const elements = projectConfig[0].assigned_elements;
+                    const indexDeleted = elements.findIndex((e) => {
+                        return e.component_name === label;
+                    });
+                    if(indexDeleted !== -1) {
+                        elements.splice(indexDeleted, 1);
+                    }
+
+                    const update = await ProjectConfig.updateOne({project_id: projectID}, {assigned_elements: elements});
+
+                    if(update) {
+                        res.send({status: 'OK', msg: 'Component deleted!'});
+                    } else {
+                        res.send({status: 'Error', msg: 'An error occurred!'});
+                    }
+                } else {
+                    res.send({status: 'Error', msg: 'An error occurred!'});
+                }
+            } else {
+                res.send({status: 'Error', msg: 'An error occurred!'});
+            }
+        } else {
+            res.send({status: 'Error', msg: 'An error occurred!'});
+        }
+    } else {
+        res.send({status: 'Error', msg: 'Project config not found!'});
+    }
+});
+
+app.post('/project/config/get', async function (req, res) {
+    // Temporary Cross Origin workaround
+    res.header("Access-Control-Allow-Origin", "*");
+    const projectID = req.body.pid;
+    const component = req.body.component;
+    const componentElements = component.split('_');
+    const type = componentElements[0];
+    let label = '';
+    if(componentElements[2]) {
+        label = componentElements[1] + '_' + componentElements[2];
+    } else {
+        label = componentElements[1];
+    }
+
+    const projectConfig = await ProjectConfig.find({project_id: projectID}).exec();
+    if (projectConfig.length === 1) {
+        let collection;
+
+        switch(type) {
+            case 'actuator':
+                collection = ActuatorConfig;
+                break;
+            case 'timer':
+                collection = TimerConfig;
+                break;
+            case 'counter':
+                collection = CounterConfig;
+                break;
+        }
+
+        if(collection) {
+            const element = await collection.find({label: label, project_id: projectID}).exec();
+
+            if(element.length > 0) {
+                res.send({status: 'OK', msg: element});
+            } else {
+                res.send({status: 'Error', msg: 'An error occurred!'});
+            }
+        } else {
+            res.send({status: 'Error', msg: 'An error occurred!'});
+        }
+    } else {
+        res.send({status: 'Error', msg: 'Project config not found!'});
+    }
+});
 
 
 // Sequence validation route
@@ -676,7 +867,6 @@ function isValid(sequence) {
             if (openingRepeating[i] >= closingRepeating[i]) {
                 errorSet.add(sequence[openingRepeating[i]]);
                 errorSet.add(sequence[closingRepeating[i]]);
-                console.log(1);
                 // Check if it is not last element of openingRepeating
                 // If it is not, check if the closing of the repeating sequence is before the next opening square bracket
                 // If it is not, add it to the error set
