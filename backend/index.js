@@ -493,6 +493,23 @@ app.get('/sequence/generate/:sequence/:sensorsPresent/:withFaults', function (re
     }
 });
 
+// Sequence validation route
+app.get('/sequence/generate2/:sequence/:sensors', function (req, res) {
+    // Temporary Cross Origin workaround
+    res.header("Access-Control-Allow-Origin", "*");
+    res.setHeader('Content-Type', 'application/json');
+
+    let sequence = req.params.sequence.toUpperCase().replaceAll(/\s/g, "").split(',');
+
+    const sequenceValidator = isValid(sequence);
+
+    if(sequenceValidator.length === 0) {
+        res.send({status: 'OK', msg: generateCode2(sequence, (req.params.sensors === '1'))});
+    } else {
+        res.send({status: 'Error', msg: sequenceValidator});
+    }
+});
+
 // POST route was used as the data passed in the form is sensitive. This will prevent the application from adding user
 // data to the URL. It is more secure than GET request.
 app.post('/user/register', async function (req, res) {
@@ -770,7 +787,7 @@ function isValid(sequence) {
     // - T followed by a letter S
     // - A number followed by a letter S
     // - A number followed by a string BAR
-    let regex = /^([A-Z]\+)|([A-Z]-)|([0-9].[0-9]+|[1-9]+[0-9]*.[0-9]+|[0-9])S|TS|([0-9].[0-9]+|[1-9]+[0-9]*.[0-9]+|[0-9])BAR$/;
+    let regex = /^((((T\+)?(([0-9].[0-9]+)|([1-9]+[0-9]*)|([1-9]+[0-9]*.[0-9]+)))S)|TS)|([A-Z]\+)|([A-Z]-)|([0-9].[0-9]+|[1-9]+[0-9]*.[0-9]+|[0-9])BAR$/;
 
     // Check if sequence starts and ends with [] it means it is a looping sequence - better way has to be found for verification
     // It is just a temporary solution
@@ -825,6 +842,7 @@ function isValid(sequence) {
 
         // Tries to match a string to the regular expression provided
         const match = temp.match(regex);
+        console.log(match);
 
         // Checks if match exists and if the string provided equals to the match returned
         // If it doesn't then the current element will be added to the error set
@@ -1096,6 +1114,210 @@ function generateCode(sequence, q, sensors, faults, complexity) {
 
     // If there were no errors in the sequence it will return the generated code to the user
     return outputCode;
+}
+
+function generateCode2(sequence, sensors) {
+    // Initial code (sequence setup) that will contain all the setup info e.g. cylinders retracted, timers reset etc
+    let setupCode = [];
+
+    // Create a set for all actuators
+    let actuators = new Set([]);
+
+    // Create setup code and case 0, so e.g. all cylinders can start in their desired positions
+    setupCode.push('CASE #NEXT OF');
+    setupCode.push('    0:');
+
+    let logicCode = [];
+    let componentsCode = [];
+    const actuation = /[A-Z](\+|-)/i;
+    const timer = /((((T\+)?(([0-9].[0-9]+)|([1-9]+[0-9]*)|([1-9]+[0-9]*.[0-9]+)))S)|TS)*/i;
+    let tempQueue = new queue();
+
+    let currentCase = 10;
+    let timerCount = 0;
+    let previousActuations = [];
+
+    while(sequence.length > 0) {
+        const current = sequence.splice(0, 1)[0];
+        let resetTimer = [];
+        // Add current case count
+        logicCode.push('    ' + currentCase + ':');
+        if(previousActuations.length > 0) {
+            let ifString = '';
+            while(previousActuations.length > 0) {
+                const cur = previousActuations.splice(0, 1)[0];
+                if(cur[1] === '-') {
+                    ifString += '((NOT Sensor_' + cur[0] + '_Extended) AND Sensor_' + cur[0] + '_Retracted) AND ';
+                } else if(cur[1] === '+') {
+                    ifString += '(Sensor_' + cur[0] + '_Extended AND (NOT Sensor_' + cur[0] + '_Retracted)) AND ';
+                } else if(cur[1] === '!') {
+                    ifString += '(Timer_' + cur[2] + '_Finished) AND ';
+                    resetTimer.push('                Timer_' + cur[2] + '_Start := FALSE;'); // Retract cylinder
+                }
+            }
+            ifString = ifString.substr(0, ifString.length - 5);
+            logicCode.push('        IF ' + ifString +' THEN:');
+            while(resetTimer.length > 0) {
+                logicCode.push(resetTimer.splice(0, 1)[0]);
+            }
+        }
+
+        if(current.startsWith('(')) {
+            tempQueue.enqueue(current.substr(1,current.length));
+            while(true) {
+                const element = sequence[0];
+                if(element.endsWith(')')) {
+                    const temp = sequence.splice(0, 1)[0];
+                    tempQueue.enqueue(temp.substr(0, temp.length - 1));
+                    break;
+                } else {
+                    tempQueue.enqueue(sequence.splice(0, 1)[0]);
+                }
+            }
+
+            while(!tempQueue.isEmpty()) {
+                const tempCurrent = tempQueue.dequeue();
+                const actuationMatch = tempCurrent.match(actuation);
+                const timerMatch = tempCurrent.match(timer);
+
+                if(actuationMatch && actuationMatch[0] !== '' && !(timerMatch && timerMatch[0] !== '')) {
+                    console.log('Inside queue',tempCurrent, 'is actuation');
+
+                    const actuator = tempCurrent[0];
+                    const action = tempCurrent[1];
+
+                    if (!actuators.has(actuator)) {
+                        actuators.add(actuator); // Add to set
+                        setupCode.push('        Cylinder_' + actuator + '_Extend := FALSE;'); // Retract cylinder
+                        setupCode.push('        Cylinder_' + actuator + '_Retract := TRUE;'); // Retract cylinder
+                    }
+
+                    if(action === '-') {
+                        logicCode.push('                Cylinder_' + actuator + '_Extend := FALSE;'); // Retract cylinder
+                        logicCode.push('                Cylinder_' + actuator + '_Retract := TRUE;'); // Retract cylinder
+                    }
+
+                    if(action === '+') {
+                        logicCode.push('                Cylinder_' + actuator + '_Retract := FALSE;'); // Extend cylinder
+                        logicCode.push('                Cylinder_' + actuator + '_Extend := TRUE;'); // Extend cylinder
+                    }
+
+                    previousActuations.push(tempCurrent);
+                }
+
+                if(timerMatch && timerMatch[0] !== '') {
+                    previousActuations.push('!!' + timerCount);
+                    logicCode.push('                Timer_' + timerCount +'_Start := TRUE;');
+                    let time = '';
+                    let currentTime = tempCurrent;
+
+                    if(tempCurrent.startsWith('T+')) {
+                        currentTime = currentTime.replaceAll('T+', '').replaceAll('S', '')
+                        time = '(T_VARIABLE + ' + currentTime + ')';
+                    } else if(tempCurrent.startsWith('T')) {
+                        time = 'T_VARIABLE';
+                    } else {
+                        currentTime = currentTime.replaceAll('T', '').replaceAll('S', '').replaceAll('+', '')
+                        time = currentTime;
+                    }
+
+
+
+                    componentsCode.push('"IEC_Timer_'+timerCount+'_DB".TON(IN:="Timer_'+timerCount+'_Start",');
+                    componentsCode.push('                     PT:=t#'+time+'s,');
+                    componentsCode.push('                     Q=>"Timer_'+timerCount+'_Finished",');
+                    componentsCode.push('                     ET=>"Timer_'+timerCount+'_Elapsed");');
+                    timerCount++;
+                }
+            }
+
+            if(currentCase === 10) {
+                if(previousActuations.length > 0) {
+                    let ifString = '';
+                    for(let i = 0; i < previousActuations.length; i++) {
+                        const cur = previousActuations[i];
+                        if(cur[1] !== '!') {
+                            ifString += '((NOT Sensor_' + cur[0] + '_Extended) AND Sensor_' + cur[0] + '_Retracted) AND ';
+                        }
+                    }
+                    ifString = ifString.substr(0, ifString.length - 5);
+                    logicCode[0] = logicCode[0] + '\n' + '        IF ' + ifString +' THEN:';
+                }
+            }
+
+            currentCase += 10;
+            logicCode.push('                #NEXT := ' + currentCase + ';'); // Move to the next case
+            logicCode.push('        #END_IF;'); // Move to the next case
+        } else {
+            const actuationMatch = current.match(actuation);
+            const timerMatch = current.match(timer);
+
+            if(actuationMatch && actuationMatch[0] !== '' && !(timerMatch && timerMatch[0] !== '')) {
+                const actuator = current[0];
+                const action = current[1];
+
+                console.log(current, 'is actuation');
+                if (!actuators.has(actuator)) {
+                    actuators.add(actuator); // Add to set
+                    setupCode.push('        Cylinder_' + actuator + '_Extend := FALSE;'); // Retract cylinder
+                    setupCode.push('        Cylinder_' + actuator + '_Retract := TRUE;'); // Retract cylinder
+                }
+
+                if(action === '-') {
+                    logicCode.push('                Cylinder_' + actuator + '_Extend := FALSE;'); // Retract cylinder
+                    logicCode.push('                Cylinder_' + actuator + '_Retract := TRUE;'); // Retract cylinder
+                }
+
+                if(action === '+') {
+                    logicCode.push('                Cylinder_' + actuator + '_Retract := FALSE;'); // Extend cylinder
+                    logicCode.push('                Cylinder_' + actuator + '_Extend := TRUE;'); // Extend cylinder
+                }
+
+                console.log(actuator, action);
+                previousActuations.push(current);
+            }
+
+            if(timerMatch && timerMatch[0] !== '') {
+                console.log(current, 'is timer');
+                previousActuations.push('!!' + timerCount);
+                logicCode.push('                Timer_' + timerCount +'_Start := TRUE;');
+
+                let time = '';
+                let variableTime = false;
+                let currentTime = current;
+                if(current.startsWith('T+')) {
+                    time = 'T_VARIABLE + ';
+                    variableTime = true;
+                } else if(current.startsWith('T')) {
+                    time = 'T_VARIABLE';
+                    variableTime = true;
+                }
+
+                if(variableTime) {
+                    currentTime = currentTime.replaceAll('T', '').replaceAll('+', '').replaceAll('S', '')
+                }
+
+                time += currentTime;
+
+
+                componentsCode.push('"IEC_Timer_'+timerCount+'_DB".TON(IN:="Timer_'+timerCount+'_Start",');
+                componentsCode.push('PT:=t#'+time+'s,');
+                componentsCode.push('Q=>"Timer_'+timerCount+'_Finished",');
+                componentsCode.push('ET=>"Timer_'+timerCount+'_Elapsed");');
+                timerCount++;
+            }
+
+            currentCase += 10;
+            logicCode.push('                #NEXT := ' + currentCase + ';'); // Move to the next case
+            logicCode.push('        #END_IF;'); // Move to the next case
+        }
+        console.log(previousActuations);
+    }
+    setupCode.push('        #NEXT := 10;<br>');
+    logicCode.splice(logicCode.length - 2, 1);
+    let finalCode = setupCode.join('\n') + '\n\n' + logicCode.join('\n') + '\n\n' + componentsCode.join('\n');
+    console.log(finalCode);
+    return finalCode;
 }
 
 module.exports = app
