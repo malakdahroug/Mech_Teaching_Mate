@@ -1158,9 +1158,7 @@ function generateCode2(sequence, sensors) {
                     sequence[i] = sequence[i].replace(']', '');
                     break;
                 } else if(sequence[i].search(/]\^([2-9]|[1-9]+[0-9]+)/i) !== -1) {
-                    console.log('counter');
                     countValue = parseInt(sequence[i].substring(sequence[i].search(']') + 2, sequence[i].length));
-                    console.log(countValue);
                     setupCode.push('        Counter_' + countersCount +'_Value := 0;'); // Retract cylinder
                     countersCount++;
                     break;
@@ -1275,12 +1273,10 @@ function generateCode2(sequence, sensors) {
 
             currentCase += 10;
 
-            if(repeatingCount !== 0 && currentRepeatingStep < repeatingCount) {
-                currentRepeatingStep++;
-            }
 
             if(repeatingCount === currentRepeatingStep) {
-                const nextCase = currentCase - repeatingCount*10;
+                const nextCase = currentCase - repeatingCount*10 - 10;
+
                 if(countValue !== 0) {
                     const limit = countersCount - 1;
                     logicCode.push('                IF Counter_' + limit +'_Value = ' + countValue +' THEN'); // Move to the next case
@@ -1291,13 +1287,21 @@ function generateCode2(sequence, sensors) {
                     logicCode.push('                END_IF;'); // Move to the next case
                     countValue = 0;
                 } else {
-                    logicCode.push('                #NEXT := ' + nextCase + ';'); // Move to the next case
+                    if(repeatingCount > 0) {
+                        logicCode.push('                #NEXT := ' + nextCase + ';'); // Move to the next case
+                    } else {
+                        logicCode.push('                #NEXT := ' + currentCase + ';'); // Move to the next case
+                    }
                 }
 
                 currentRepeatingStep = 0;
                 repeatingCount = 0;
             } else {
                 logicCode.push('                #NEXT := ' + currentCase + ';'); // Move to the next case
+            }
+
+            if(repeatingCount !== 0 && currentRepeatingStep < repeatingCount) {
+                currentRepeatingStep++;
             }
 
             if(currentCase !== 20) {
@@ -1365,12 +1369,10 @@ function generateCode2(sequence, sensors) {
 
             currentCase += 10;
 
-            if(repeatingCount !== 0 && currentRepeatingStep < repeatingCount) {
-                currentRepeatingStep++;
-            }
 
             if(repeatingCount === currentRepeatingStep) {
-                const nextCase = currentCase - repeatingCount*10;
+                const nextCase = currentCase - repeatingCount*10 - 10;
+
                 if(countValue !== 0) {
                     const limit = countersCount - 1;
                     logicCode.push('                IF Counter_' + limit +'_Value = ' + countValue +' THEN'); // Move to the next case
@@ -1381,13 +1383,21 @@ function generateCode2(sequence, sensors) {
                     logicCode.push('                END_IF;'); // Move to the next case
                     countValue = 0;
                 } else {
-                    logicCode.push('                #NEXT := ' + nextCase + ';'); // Move to the next case
+                    if(repeatingCount > 0) {
+                        logicCode.push('                #NEXT := ' + nextCase + ';'); // Move to the next case
+                    } else {
+                        logicCode.push('                #NEXT := ' + currentCase + ';'); // Move to the next case
+                    }
                 }
 
                 currentRepeatingStep = 0;
                 repeatingCount = 0;
             } else {
                 logicCode.push('                #NEXT := ' + currentCase + ';'); // Move to the next case
+            }
+
+            if(repeatingCount !== 0 && currentRepeatingStep < repeatingCount) {
+                currentRepeatingStep++;
             }
 
             if(currentCase !== 20) {
@@ -1400,6 +1410,7 @@ function generateCode2(sequence, sensors) {
         }
     }
     setupCode.push('        #NEXT := 10;<br>');
+
     if(!repeatingEnd) {
         logicCode.splice(logicCode.length - 2, 1);
     }
