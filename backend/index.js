@@ -308,7 +308,7 @@ app.post('/project/config/delete', async function (req, res) {
     const componentElements = component.split('_');
     const type = componentElements[0];
     let label = '';
-    if(componentElements[2]) {
+    if (componentElements[2]) {
         label = componentElements[1] + '_' + componentElements[2];
     } else {
         label = componentElements[1];
@@ -318,7 +318,7 @@ app.post('/project/config/delete', async function (req, res) {
     if (projectConfig.length === 1) {
         let collection;
 
-        switch(type) {
+        switch (type) {
             case 'actuator':
                 collection = ActuatorConfig;
                 break;
@@ -330,24 +330,24 @@ app.post('/project/config/delete', async function (req, res) {
                 break;
         }
 
-        if(collection) {
+        if (collection) {
             const element = await collection.find({label: label, project_id: projectID}).exec();
 
-            if(element.length > 0) {
+            if (element.length > 0) {
                 const result = await collection.deleteMany({label: label, project_id: projectID});
 
-                if(result) {
+                if (result) {
                     const elements = projectConfig[0].assigned_elements;
                     const indexDeleted = elements.findIndex((e) => {
                         return e.component_name === label;
                     });
-                    if(indexDeleted !== -1) {
+                    if (indexDeleted !== -1) {
                         elements.splice(indexDeleted, 1);
                     }
 
                     const update = await ProjectConfig.updateOne({project_id: projectID}, {assigned_elements: elements});
 
-                    if(update) {
+                    if (update) {
                         res.send({status: 'OK', msg: 'Component deleted!'});
                     } else {
                         res.send({status: 'Error', msg: 'An error occurred!'});
@@ -374,7 +374,7 @@ app.post('/project/config/get', async function (req, res) {
     const componentElements = component.split('_');
     const type = componentElements[0];
     let label = '';
-    if(componentElements[2]) {
+    if (componentElements[2]) {
         label = componentElements[1] + '_' + componentElements[2];
     } else {
         label = componentElements[1];
@@ -384,7 +384,7 @@ app.post('/project/config/get', async function (req, res) {
     if (projectConfig.length === 1) {
         let collection;
 
-        switch(type) {
+        switch (type) {
             case 'actuator':
                 collection = ActuatorConfig;
                 break;
@@ -396,10 +396,10 @@ app.post('/project/config/get', async function (req, res) {
                 break;
         }
 
-        if(collection) {
+        if (collection) {
             const element = await collection.find({label: label, project_id: projectID}).exec();
 
-            if(element.length > 0) {
+            if (element.length > 0) {
                 res.send({status: 'OK', msg: element});
             } else {
                 res.send({status: 'Error', msg: 'An error occurred!'});
@@ -501,9 +501,9 @@ app.get('/sequence/generate2/:sequence/:sensors', function (req, res) {
 
     let sequence = req.params.sequence.toUpperCase().replaceAll(/\s/g, "").split(',');
 
-    const sequenceValidator = isValid(sequence);
+    const sequenceValidator = isValid([...sequence]);
 
-    if(sequenceValidator.length === 0) {
+    if (sequenceValidator.length === 0) {
         res.send({status: 'OK', msg: generateCode2(sequence, (req.params.sensors === '1'))});
     } else {
         res.send({status: 'Error', msg: sequenceValidator});
@@ -842,7 +842,6 @@ function isValid(sequence) {
 
         // Tries to match a string to the regular expression provided
         const match = temp.match(regex);
-        console.log(match);
 
         // Checks if match exists and if the string provided equals to the match returned
         // If it doesn't then the current element will be added to the error set
@@ -1136,52 +1135,84 @@ function generateCode2(sequence, sensors) {
     let currentCase = 10;
     let timerCount = 0;
     let previousActuations = [];
+    let repeatingCount = 0;
+    let currentRepeatingCount = 0;
+    let countersCount = 0;
+    let counterCondition = '';
+    let last = sequence[sequence.length - 1].search(/]\^/) !== -1;
 
-    while(sequence.length > 0) {
-        const current = sequence.splice(0, 1)[0];
+    while (sequence.length > 0) {
+        let current = sequence.splice(0, 1)[0];
         let resetTimer = [];
         // Add current case count
+
+        if(current.search(/\[/) !== -1) {
+            countersCount++;
+            current = current.replace(/\[/, '');
+            for(let i = 0; i < sequence.length; i++) {
+                console.log(sequence[i])
+                repeatingCount++;
+                if(sequence[i].search(/]/) !== -1) {
+                    if(sequence[i].search(/]\^N\+/) !== -1) {
+                        counterCondition = '(N_VARIABLE + ' + sequence[i].substr(sequence[i].search(/]\^N\+/) + 4) + ')';
+                        sequence[i] = sequence[i].substr(0, sequence[i].search(/]\^N\+/));
+                    } else if(sequence[i].search(/]\^/) !== -1) {
+                        counterCondition = sequence[i].substr(sequence[i].search(/]\^/) + 2);
+                        sequence[i] = sequence[i].substr(0, sequence[i].search(/]\^/));
+                    } else {
+                        counterCondition = null;
+                    }
+                    break;
+                }
+            }
+        }
+
         logicCode.push('    ' + currentCase + ':');
-        if(previousActuations.length > 0) {
+        if (previousActuations.length > 0) {
             let ifString = '';
-            while(previousActuations.length > 0) {
+            while (previousActuations.length > 0) {
                 const cur = previousActuations.splice(0, 1)[0];
-                if(cur[1] === '-') {
+                if (cur[1] === '-') {
                     ifString += '((NOT Sensor_' + cur[0] + '_Extended) AND Sensor_' + cur[0] + '_Retracted) AND ';
-                } else if(cur[1] === '+') {
+                } else if (cur[1] === '+') {
                     ifString += '(Sensor_' + cur[0] + '_Extended AND (NOT Sensor_' + cur[0] + '_Retracted)) AND ';
-                } else if(cur[1] === '!') {
+                } else if (cur[1] === '!') {
                     ifString += '(Timer_' + cur[2] + '_Finished) AND ';
                     resetTimer.push('                Timer_' + cur[2] + '_Start := FALSE;'); // Retract cylinder
                 }
             }
             ifString = ifString.substr(0, ifString.length - 5);
-            logicCode.push('        IF ' + ifString +' THEN:');
-            while(resetTimer.length > 0) {
+            logicCode.push('        IF ' + ifString + ' THEN:');
+            while (resetTimer.length > 0) {
                 logicCode.push(resetTimer.splice(0, 1)[0]);
             }
         }
 
-        if(current.startsWith('(')) {
-            tempQueue.enqueue(current.substr(1,current.length));
-            while(true) {
+        if (current.search(/\(/) !== -1) {
+            tempQueue.enqueue(current.substr(1, current.length));
+            while (true) {
                 const element = sequence[0];
-                if(element.endsWith(')')) {
-                    const temp = sequence.splice(0, 1)[0];
-                    tempQueue.enqueue(temp.substr(0, temp.length - 1));
-                    break;
+                if(element) {
+                    repeatingCount--;
+                    if (element.search(/\)/) !== -1) {
+                        const temp = sequence.splice(0, 1)[0];
+                        tempQueue.enqueue(temp.substr(0, temp.length - 1));
+                        break;
+                    } else {
+                        tempQueue.enqueue(sequence.splice(0, 1)[0]);
+                    }
                 } else {
-                    tempQueue.enqueue(sequence.splice(0, 1)[0]);
+                    break;
                 }
             }
 
-            while(!tempQueue.isEmpty()) {
+            let lastIndex = logicCode.length - 1;
+            while (!tempQueue.isEmpty()) {
+                let ifString = '';
                 const tempCurrent = tempQueue.dequeue();
                 const actuationMatch = tempCurrent.match(actuation);
                 const timerMatch = tempCurrent.match(timer);
-
-                if(actuationMatch && actuationMatch[0] !== '' && !(timerMatch && timerMatch[0] !== '')) {
-                    console.log('Inside queue',tempCurrent, 'is actuation');
+                if (actuationMatch && actuationMatch[0] !== '' && !(timerMatch && timerMatch[0] !== '')) {
 
                     const actuator = tempCurrent[0];
                     const action = tempCurrent[1];
@@ -1192,29 +1223,39 @@ function generateCode2(sequence, sensors) {
                         setupCode.push('        Cylinder_' + actuator + '_Retract := TRUE;'); // Retract cylinder
                     }
 
-                    if(action === '-') {
+                    if (action === '-') {
                         logicCode.push('                Cylinder_' + actuator + '_Extend := FALSE;'); // Retract cylinder
                         logicCode.push('                Cylinder_' + actuator + '_Retract := TRUE;'); // Retract cylinder
+                        ifString = ' AND (Sensor_' + actuator + '_Extended AND (NOT Sensor_' + actuator + '_Retracted)) THEN:';
                     }
 
-                    if(action === '+') {
+                    if (action === '+') {
                         logicCode.push('                Cylinder_' + actuator + '_Retract := FALSE;'); // Extend cylinder
                         logicCode.push('                Cylinder_' + actuator + '_Extend := TRUE;'); // Extend cylinder
+                        ifString = ' AND ((NOT Sensor_' + actuator + '_Extended) AND Sensor_' + actuator + '_Retracted) THEN:';
+                    }
+
+                    if (currentCase !== 10) {
+                        if (logicCode[lastIndex].search('Timer') !== -1) {
+                            logicCode[lastIndex - 1] = logicCode[lastIndex - 1].substr(0, logicCode[lastIndex - 1].length - 6) + ifString;
+                        } else {
+                            logicCode[lastIndex] = logicCode[lastIndex].substr(0, logicCode[lastIndex].length - 6) + ifString;
+                        }
                     }
 
                     previousActuations.push(tempCurrent);
                 }
 
-                if(timerMatch && timerMatch[0] !== '') {
+                if (timerMatch && timerMatch[0] !== '') {
                     previousActuations.push('!!' + timerCount);
-                    logicCode.push('                Timer_' + timerCount +'_Start := TRUE;');
+                    logicCode.push('                Timer_' + timerCount + '_Start := TRUE;');
                     let time = '';
                     let currentTime = tempCurrent;
 
-                    if(tempCurrent.startsWith('T+')) {
+                    if (tempCurrent.search('T+') !== -1) {
                         currentTime = currentTime.replaceAll('T+', '').replaceAll('S', '')
                         time = '(T_VARIABLE + ' + currentTime + ')';
-                    } else if(tempCurrent.startsWith('T')) {
+                    } else if (tempCurrent.search('T') !== -1) {
                         time = 'T_VARIABLE';
                     } else {
                         currentTime = currentTime.replaceAll('T', '').replaceAll('S', '').replaceAll('+', '')
@@ -1222,101 +1263,131 @@ function generateCode2(sequence, sensors) {
                     }
 
 
-
-                    componentsCode.push('"IEC_Timer_'+timerCount+'_DB".TON(IN:="Timer_'+timerCount+'_Start",');
-                    componentsCode.push('                     PT:=t#'+time+'s,');
-                    componentsCode.push('                     Q=>"Timer_'+timerCount+'_Finished",');
-                    componentsCode.push('                     ET=>"Timer_'+timerCount+'_Elapsed");');
+                    componentsCode.push('"IEC_Timer_' + timerCount + '_DB".TON(IN:="Timer_' + timerCount + '_Start",');
+                    componentsCode.push('                     PT:=t#' + time + 's,');
+                    componentsCode.push('                     Q=>"Timer_' + timerCount + '_Finished",');
+                    componentsCode.push('                     ET=>"Timer_' + timerCount + '_Elapsed");\n');
                     timerCount++;
                 }
             }
-
-            if(currentCase === 10) {
-                if(previousActuations.length > 0) {
-                    let ifString = '';
-                    for(let i = 0; i < previousActuations.length; i++) {
-                        const cur = previousActuations[i];
-                        if(cur[1] !== '!') {
-                            ifString += '((NOT Sensor_' + cur[0] + '_Extended) AND Sensor_' + cur[0] + '_Retracted) AND ';
-                        }
-                    }
-                    ifString = ifString.substr(0, ifString.length - 5);
-                    logicCode[0] = logicCode[0] + '\n' + '        IF ' + ifString +' THEN:';
-                }
-            }
-
-            currentCase += 10;
-            logicCode.push('                #NEXT := ' + currentCase + ';'); // Move to the next case
-            logicCode.push('        #END_IF;'); // Move to the next case
         } else {
+            let lastIndex = logicCode.length - 1;
+            let ifString = '';
             const actuationMatch = current.match(actuation);
             const timerMatch = current.match(timer);
 
-            if(actuationMatch && actuationMatch[0] !== '' && !(timerMatch && timerMatch[0] !== '')) {
+            if (actuationMatch && actuationMatch[0] !== '' && !(timerMatch && timerMatch[0] !== '')) {
                 const actuator = current[0];
                 const action = current[1];
 
-                console.log(current, 'is actuation');
                 if (!actuators.has(actuator)) {
                     actuators.add(actuator); // Add to set
                     setupCode.push('        Cylinder_' + actuator + '_Extend := FALSE;'); // Retract cylinder
                     setupCode.push('        Cylinder_' + actuator + '_Retract := TRUE;'); // Retract cylinder
                 }
 
-                if(action === '-') {
+                if (action === '-') {
                     logicCode.push('                Cylinder_' + actuator + '_Extend := FALSE;'); // Retract cylinder
                     logicCode.push('                Cylinder_' + actuator + '_Retract := TRUE;'); // Retract cylinder
+                    ifString = ' AND (Sensor_' + actuator + '_Extended AND (NOT Sensor_' + actuator + '_Retracted)) THEN:';
                 }
 
-                if(action === '+') {
+                if (action === '+') {
                     logicCode.push('                Cylinder_' + actuator + '_Retract := FALSE;'); // Extend cylinder
                     logicCode.push('                Cylinder_' + actuator + '_Extend := TRUE;'); // Extend cylinder
+                    ifString = ' AND ((NOT Sensor_' + actuator + '_Extended) AND Sensor_' + actuator + '_Retracted) THEN:';
                 }
 
-                console.log(actuator, action);
+                if (currentCase !== 10) {
+                    if (logicCode[lastIndex].search('Timer') !== -1) {
+                        logicCode[lastIndex - 1] = logicCode[lastIndex - 1].substr(0, logicCode[lastIndex - 1].length - 6) + ifString;
+                    } else {
+                        logicCode[lastIndex] = logicCode[lastIndex].substr(0, logicCode[lastIndex].length - 6) + ifString;
+                    }
+                }
+
+
                 previousActuations.push(current);
             }
 
-            if(timerMatch && timerMatch[0] !== '') {
-                console.log(current, 'is timer');
+            if (timerMatch && timerMatch[0] !== '') {
                 previousActuations.push('!!' + timerCount);
-                logicCode.push('                Timer_' + timerCount +'_Start := TRUE;');
+                logicCode.push('                Timer_' + timerCount + '_Start := TRUE;');
 
                 let time = '';
                 let variableTime = false;
                 let currentTime = current;
-                if(current.startsWith('T+')) {
+                if (current.startsWith('T+')) {
                     time = 'T_VARIABLE + ';
                     variableTime = true;
-                } else if(current.startsWith('T')) {
+                } else if (current.startsWith('T')) {
                     time = 'T_VARIABLE';
                     variableTime = true;
                 }
 
-                if(variableTime) {
+                if (variableTime) {
                     currentTime = currentTime.replaceAll('T', '').replaceAll('+', '').replaceAll('S', '')
                 }
 
                 time += currentTime;
 
 
-                componentsCode.push('"IEC_Timer_'+timerCount+'_DB".TON(IN:="Timer_'+timerCount+'_Start",');
-                componentsCode.push('PT:=t#'+time+'s,');
-                componentsCode.push('Q=>"Timer_'+timerCount+'_Finished",');
-                componentsCode.push('ET=>"Timer_'+timerCount+'_Elapsed");');
+                componentsCode.push('"IEC_Timer_' + timerCount + '_DB".TON(IN:="Timer_' + timerCount + '_Start",');
+                componentsCode.push('                     PT:=t#' + time + 's,');
+                componentsCode.push('                     Q=>"Timer_' + timerCount + '_Finished",');
+                componentsCode.push('                     ET=>"Timer_' + timerCount + '_Elapsed");\n');
                 timerCount++;
             }
-
-            currentCase += 10;
-            logicCode.push('                #NEXT := ' + currentCase + ';'); // Move to the next case
-            logicCode.push('        #END_IF;'); // Move to the next case
         }
-        console.log(previousActuations);
+        if (currentCase === 10) {
+            if (previousActuations.length > 0) {
+                let ifString = '';
+                for (let i = 0; i < previousActuations.length; i++) {
+                    const cur = previousActuations[i];
+                    if (cur[1] !== '!') {
+                        ifString += '((NOT Sensor_' + cur[0] + '_Extended) AND Sensor_' + cur[0] + '_Retracted) AND ';
+                    }
+                }
+                ifString = ifString.substr(0, ifString.length - 5);
+                logicCode[0] = logicCode[0] + '\n' + '        IF ' + ifString + ' THEN:';
+            }
+        }
+
+        currentCase += 10;
+        if(repeatingCount === 0) {
+            logicCode.push('                #NEXT := ' + currentCase + ';'); // Move to the next case
+        } else if(repeatingCount === currentRepeatingCount) {
+            let nextCase = currentCase - 10*repeatingCount - 10;
+            if(counterCondition != null) {
+                logicCode.push('                IF Counter_' + countersCount + '_Value = ' + counterCondition + ' THEN:');
+                logicCode.push('                        Counter_' + countersCount + '_Value := Counter_' + countersCount + '_Value + 1;'); // Move to the next case
+                logicCode.push('                        #NEXT := ' + nextCase + ';'); // Move to the next case
+                if(!last) {
+                    logicCode.push('                ELSE');
+                    logicCode.push('                        #NEXT := ' + currentCase + ';'); // Move to the next case
+                }
+                logicCode.push('                END_IF;');
+            } else {
+                logicCode.push('                #NEXT := ' + nextCase + ';'); // Move to the next case
+            }
+
+            repeatingCount = 0;
+            currentRepeatingCount = 0;
+        } else {
+            logicCode.push('                #NEXT := ' + currentCase + ';'); // Move to the next case
+            currentRepeatingCount++;
+        }
+
+        logicCode.push('        #END_IF;'); // Move to the next case
     }
-    setupCode.push('        #NEXT := 10;<br>');
-    logicCode.splice(logicCode.length - 2, 1);
+
+    if(!last) {
+        logicCode.splice(logicCode.length - 2, 1);
+    }
+
+    setupCode.push('        #NEXT := 10;\n');
+
     let finalCode = setupCode.join('\n') + '\n\n' + logicCode.join('\n') + '\n\n' + componentsCode.join('\n');
-    console.log(finalCode);
     return finalCode;
 }
 
