@@ -842,7 +842,6 @@ function isValid(sequence) {
 
         // Tries to match a string to the regular expression provided
         const match = temp.match(regex);
-        console.log(match);
 
         // Checks if match exists and if the string provided equals to the match returned
         // If it doesn't then the current element will be added to the error set
@@ -1133,12 +1132,42 @@ function generateCode2(sequence, sensors) {
     const timer = /((((T\+)?(([0-9].[0-9]+)|([1-9]+[0-9]*)|([1-9]+[0-9]*.[0-9]+)))S)|TS)*/i;
     let tempQueue = new queue();
 
+
     let currentCase = 10;
     let timerCount = 0;
+    let countersCount = 0;
     let previousActuations = [];
+    let repeatingCount = 0;
+    let currentRepeatingStep = 0;
+    let repeatingEnd = false;
+    let countValue = 0;
+
+    if(sequence[sequence.length - 1].endsWith(']')) {
+        repeatingEnd = true;
+    }
 
     while(sequence.length > 0) {
-        const current = sequence.splice(0, 1)[0];
+
+        let current = sequence.splice(0, 1)[0];
+
+        if(current.startsWith('[')) {
+            current = current.replace('[', '');
+            for(let i = 0; i < sequence.length; i++) {
+                repeatingCount++;
+                if(sequence[i].endsWith(']')) {
+                    sequence[i] = sequence[i].replace(']', '');
+                    break;
+                } else if(sequence[i].search(/]\^([2-9]|[1-9]+[0-9]+)/i) !== -1) {
+                    console.log('counter');
+                    countValue = parseInt(sequence[i].substring(sequence[i].search(']') + 2, sequence[i].length));
+                    console.log(countValue);
+                    setupCode.push('        Counter_' + countersCount +'_Value := 0;'); // Retract cylinder
+                    countersCount++;
+                    break;
+                }
+            }
+        }
+
         let resetTimer = [];
         // Add current case count
         logicCode.push('    ' + currentCase + ':');
@@ -1181,7 +1210,6 @@ function generateCode2(sequence, sensors) {
                 const timerMatch = tempCurrent.match(timer);
 
                 if(actuationMatch && actuationMatch[0] !== '' && !(timerMatch && timerMatch[0] !== '')) {
-                    console.log('Inside queue',tempCurrent, 'is actuation');
 
                     const actuator = tempCurrent[0];
                     const action = tempCurrent[1];
@@ -1246,8 +1274,39 @@ function generateCode2(sequence, sensors) {
             }
 
             currentCase += 10;
-            logicCode.push('                #NEXT := ' + currentCase + ';'); // Move to the next case
-            logicCode.push('        #END_IF;'); // Move to the next case
+
+            if(repeatingCount !== 0 && currentRepeatingStep < repeatingCount) {
+                currentRepeatingStep++;
+            }
+
+            if(repeatingCount === currentRepeatingStep) {
+                const nextCase = currentCase - repeatingCount*10;
+                if(countValue !== 0) {
+                    const limit = countersCount - 1;
+                    logicCode.push('                IF Counter_' + limit +'_Value = ' + countValue +' THEN'); // Move to the next case
+                    logicCode.push('                        #NEXT := ' + currentCase + ';'); // Move to the next case
+                    logicCode.push('                ELSE'); // Move to the next case
+                    logicCode.push('                        Counter_' + limit +'_Value := Counter_' + limit +'_Value + 1;'); // Move to the next case
+                    logicCode.push('                        #NEXT := ' + nextCase + ';'); // Move to the next case
+                    logicCode.push('                END_IF;'); // Move to the next case
+                    countValue = 0;
+                } else {
+                    logicCode.push('                #NEXT := ' + nextCase + ';'); // Move to the next case
+                }
+
+                currentRepeatingStep = 0;
+                repeatingCount = 0;
+            } else {
+                logicCode.push('                #NEXT := ' + currentCase + ';'); // Move to the next case
+            }
+
+            if(currentCase !== 20) {
+                logicCode.push('        #END_IF;'); // Move to the next case
+            } else {
+                for(let i = 0; i < logicCode.length; i++) {
+                    logicCode[i] = logicCode[i].replace('                ', '        ');
+                }
+            }
         } else {
             const actuationMatch = current.match(actuation);
             const timerMatch = current.match(timer);
@@ -1256,7 +1315,6 @@ function generateCode2(sequence, sensors) {
                 const actuator = current[0];
                 const action = current[1];
 
-                console.log(current, 'is actuation');
                 if (!actuators.has(actuator)) {
                     actuators.add(actuator); // Add to set
                     setupCode.push('        Cylinder_' + actuator + '_Extend := FALSE;'); // Retract cylinder
@@ -1273,12 +1331,10 @@ function generateCode2(sequence, sensors) {
                     logicCode.push('                Cylinder_' + actuator + '_Extend := TRUE;'); // Extend cylinder
                 }
 
-                console.log(actuator, action);
                 previousActuations.push(current);
             }
 
             if(timerMatch && timerMatch[0] !== '') {
-                console.log(current, 'is timer');
                 previousActuations.push('!!' + timerCount);
                 logicCode.push('                Timer_' + timerCount +'_Start := TRUE;');
 
@@ -1308,15 +1364,47 @@ function generateCode2(sequence, sensors) {
             }
 
             currentCase += 10;
-            logicCode.push('                #NEXT := ' + currentCase + ';'); // Move to the next case
-            logicCode.push('        #END_IF;'); // Move to the next case
+
+            if(repeatingCount !== 0 && currentRepeatingStep < repeatingCount) {
+                currentRepeatingStep++;
+            }
+
+            if(repeatingCount === currentRepeatingStep) {
+                const nextCase = currentCase - repeatingCount*10;
+                if(countValue !== 0) {
+                    const limit = countersCount - 1;
+                    logicCode.push('                IF Counter_' + limit +'_Value = ' + countValue +' THEN'); // Move to the next case
+                    logicCode.push('                        #NEXT := ' + currentCase + ';'); // Move to the next case
+                    logicCode.push('                ELSE'); // Move to the next case
+                    logicCode.push('                        Counter_' + limit +'_Value := Counter_' + limit +'_Value + 1;'); // Move to the next case
+                    logicCode.push('                        #NEXT := ' + nextCase + ';'); // Move to the next case
+                    logicCode.push('                END_IF;'); // Move to the next case
+                    countValue = 0;
+                } else {
+                    logicCode.push('                #NEXT := ' + nextCase + ';'); // Move to the next case
+                }
+
+                currentRepeatingStep = 0;
+                repeatingCount = 0;
+            } else {
+                logicCode.push('                #NEXT := ' + currentCase + ';'); // Move to the next case
+            }
+
+            if(currentCase !== 20) {
+                logicCode.push('        #END_IF;'); // Move to the next case
+            } else {
+                for(let i = 0; i < logicCode.length; i++) {
+                    logicCode[i] = logicCode[i].replace('                ', '        ');
+                }
+            }
         }
-        console.log(previousActuations);
     }
     setupCode.push('        #NEXT := 10;<br>');
-    logicCode.splice(logicCode.length - 2, 1);
+    if(!repeatingEnd) {
+        logicCode.splice(logicCode.length - 2, 1);
+    }
     let finalCode = setupCode.join('\n') + '\n\n' + logicCode.join('\n') + '\n\n' + componentsCode.join('\n');
-    console.log(finalCode);
+    // console.log(finalCode);
     return finalCode;
 }
 
