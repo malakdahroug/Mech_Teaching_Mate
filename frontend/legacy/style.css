@@ -7,9 +7,10 @@
 
 #incorrect_code {
     float: left;
-    min-width: 35vw;
+    min-width: 50vw;
     min-height: 90vh;
     display: none;
+    font-size: 0.75rem;
 }
 
 #solutionButton {

@@ -59,9 +59,13 @@ function generate2() {
     fetch('http://localhost:3000/sequence/generate2/' + document.getElementById('sequence').value + '/1')
         .then(o => o.json())
         .then(response => {
+            console.log(response);
             document.getElementById('solutionButton').innerText = 'Show solution';
-            document.getElementById('correct_code').innerHTML = '\nSOLUTION:\n\n' + response.msg.toString();
+            document.getElementById('correct_code').innerHTML = '\nSOLUTION:\n\n' + response.msg.code.toString();
+            document.getElementById('incorrect_code').innerHTML = '\nTAG SETUP:\n\n' + response.msg.tags.toString();
             document.getElementById('correct_code').style.float = 'left';
+            document.getElementById('incorrect_code').style.float = 'right';
             document.getElementById('correct_code').style.display = 'inline-block';
+            document.getElementById('incorrect_code').style.display = 'inline-block';
         });
 }

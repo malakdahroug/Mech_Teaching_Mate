@@ -1138,8 +1138,44 @@ function generateCode2(sequence, sensors) {
     let repeatingCount = 0;
     let currentRepeatingCount = 0;
     let countersCount = 0;
+    let counters = 0;
     let counterCondition = '';
+    let isTVarSet = false;
+    let isNVarSet = false;
+
+    let tempSequence = [...sequence];
+    let nested = false;
+
+    if(tempSequence[0].search(/\[/) !== -1 && tempSequence[tempSequence.length - 1].search(/]/) !== -1) {
+        tempSequence[0] = tempSequence[0].replace('[', '');
+        tempSequence[tempSequence.length - 1] = tempSequence[tempSequence.length - 1].replace(']', '');
+        for(let i = 0; i < tempSequence.length; i++) {
+            if(tempSequence[i].search(/\[/) !== -1) {
+                nested = true;
+                break;
+            }
+
+            if(tempSequence[i].search(/]/) !== -1) {
+                nested = false;
+                break;
+            }
+        }
+    }
+
+
+    if(nested) {
+        sequence[0] = sequence[0].replace('[', '');
+        sequence[sequence.length - 1] = sequence[sequence.length - 1].substr(0, sequence[sequence.length - 1].length - 1);
+
+    }
+
     let last = sequence[sequence.length - 1].search(/]\^/) !== -1;
+    let repeating = sequence[sequence.length - 1].search(/]\^/) !== -1 || sequence[sequence.length - 1].search(/]/) !== -1;
+    let lastRepeatingTimer = sequence[sequence.length - 1].search(/]\^/) !== -1 && (sequence[sequence.length - 1].search(/T/) < sequence[sequence.length - 1].search(/S/));
+
+    let xmlSetup = '<?xml version=\'1.0\' encoding=\'utf-8\'?>\n' +
+        '<Tagtable name=\'ControllerTagsFolder\'>\n';
+
 
     while (sequence.length > 0) {
         let current = sequence.splice(0, 1)[0];
@@ -1149,15 +1185,18 @@ function generateCode2(sequence, sensors) {
         if(current.search(/\[/) !== -1) {
             countersCount++;
             current = current.replace(/\[/, '');
+
             for(let i = 0; i < sequence.length; i++) {
-                console.log(sequence[i])
                 repeatingCount++;
                 if(sequence[i].search(/]/) !== -1) {
                     if(sequence[i].search(/]\^N\+/) !== -1) {
                         counterCondition = '(N_VARIABLE + ' + sequence[i].substr(sequence[i].search(/]\^N\+/) + 4) + ')';
+                        isNVarSet = true;
+                        counters++;
                         sequence[i] = sequence[i].substr(0, sequence[i].search(/]\^N\+/));
                     } else if(sequence[i].search(/]\^/) !== -1) {
                         counterCondition = sequence[i].substr(sequence[i].search(/]\^/) + 2);
+                        counters++;
                         sequence[i] = sequence[i].substr(0, sequence[i].search(/]\^/));
                     } else {
                         counterCondition = null;
@@ -1178,11 +1217,11 @@ function generateCode2(sequence, sensors) {
                     ifString += '(Sensor_' + cur[0] + '_Extended AND (NOT Sensor_' + cur[0] + '_Retracted)) AND ';
                 } else if (cur[1] === '!') {
                     ifString += '(Timer_' + cur[2] + '_Finished) AND ';
-                    resetTimer.push('                Timer_' + cur[2] + '_Start := FALSE;'); // Retract cylinder
+                    resetTimer.push('                Timer_' + cur[2] + '_Start := TRUE;'); // Retract cylinder
                 }
             }
             ifString = ifString.substr(0, ifString.length - 5);
-            logicCode.push('        IF ' + ifString + ' THEN:');
+            logicCode.push('        IF ' + ifString + ' THEN ');
             while (resetTimer.length > 0) {
                 logicCode.push(resetTimer.splice(0, 1)[0]);
             }
@@ -1226,13 +1265,13 @@ function generateCode2(sequence, sensors) {
                     if (action === '-') {
                         logicCode.push('                Cylinder_' + actuator + '_Extend := FALSE;'); // Retract cylinder
                         logicCode.push('                Cylinder_' + actuator + '_Retract := TRUE;'); // Retract cylinder
-                        ifString = ' AND (Sensor_' + actuator + '_Extended AND (NOT Sensor_' + actuator + '_Retracted)) THEN:';
+                        ifString = ' AND (Sensor_' + actuator + '_Extended AND (NOT Sensor_' + actuator + '_Retracted)) THEN ';
                     }
 
                     if (action === '+') {
                         logicCode.push('                Cylinder_' + actuator + '_Retract := FALSE;'); // Extend cylinder
                         logicCode.push('                Cylinder_' + actuator + '_Extend := TRUE;'); // Extend cylinder
-                        ifString = ' AND ((NOT Sensor_' + actuator + '_Extended) AND Sensor_' + actuator + '_Retracted) THEN:';
+                        ifString = ' AND ((NOT Sensor_' + actuator + '_Extended) AND Sensor_' + actuator + '_Retracted) THEN ';
                     }
 
                     if (currentCase !== 10) {
@@ -1255,16 +1294,18 @@ function generateCode2(sequence, sensors) {
                     if (tempCurrent.search('T+') !== -1) {
                         currentTime = currentTime.replaceAll('T+', '').replaceAll('S', '')
                         time = '(T_VARIABLE + ' + currentTime + ')';
+                        isTVarSet = true;
                     } else if (tempCurrent.search('T') !== -1) {
                         time = 'T_VARIABLE';
+                        isTVarSet = true;
                     } else {
-                        currentTime = currentTime.replaceAll('T', '').replaceAll('S', '').replaceAll('+', '')
+                        currentTime = currentTime.replaceAll('T', '').replaceAll('S', '').replaceAll('+', '').replaceAll(']', '');
                         time = currentTime;
                     }
 
 
                     componentsCode.push('"IEC_Timer_' + timerCount + '_DB".TON(IN:="Timer_' + timerCount + '_Start",');
-                    componentsCode.push('                     PT:=t#' + time + 's,');
+                    componentsCode.push('                     PT:=t#' + time + ',');
                     componentsCode.push('                     Q=>"Timer_' + timerCount + '_Finished",');
                     componentsCode.push('                     ET=>"Timer_' + timerCount + '_Elapsed");\n');
                     timerCount++;
@@ -1289,13 +1330,13 @@ function generateCode2(sequence, sensors) {
                 if (action === '-') {
                     logicCode.push('                Cylinder_' + actuator + '_Extend := FALSE;'); // Retract cylinder
                     logicCode.push('                Cylinder_' + actuator + '_Retract := TRUE;'); // Retract cylinder
-                    ifString = ' AND (Sensor_' + actuator + '_Extended AND (NOT Sensor_' + actuator + '_Retracted)) THEN:';
+                    ifString = ' AND (Sensor_' + actuator + '_Extended AND (NOT Sensor_' + actuator + '_Retracted)) THEN ';
                 }
 
                 if (action === '+') {
                     logicCode.push('                Cylinder_' + actuator + '_Retract := FALSE;'); // Extend cylinder
                     logicCode.push('                Cylinder_' + actuator + '_Extend := TRUE;'); // Extend cylinder
-                    ifString = ' AND ((NOT Sensor_' + actuator + '_Extended) AND Sensor_' + actuator + '_Retracted) THEN:';
+                    ifString = ' AND ((NOT Sensor_' + actuator + '_Extended) AND Sensor_' + actuator + '_Retracted) THEN ';
                 }
 
                 if (currentCase !== 10) {
@@ -1319,21 +1360,23 @@ function generateCode2(sequence, sensors) {
                 let currentTime = current;
                 if (current.startsWith('T+')) {
                     time = 'T_VARIABLE + ';
+                    isTVarSet = true;
                     variableTime = true;
                 } else if (current.startsWith('T')) {
                     time = 'T_VARIABLE';
+                    isTVarSet = true;
                     variableTime = true;
                 }
 
                 if (variableTime) {
-                    currentTime = currentTime.replaceAll('T', '').replaceAll('+', '').replaceAll('S', '')
+                    currentTime = currentTime.replaceAll('T', '').replaceAll('+', '').replaceAll('S', '').replaceAll(']', '');
                 }
 
                 time += currentTime;
 
 
                 componentsCode.push('"IEC_Timer_' + timerCount + '_DB".TON(IN:="Timer_' + timerCount + '_Start",');
-                componentsCode.push('                     PT:=t#' + time + 's,');
+                componentsCode.push('                     PT:=t#' + time + ',');
                 componentsCode.push('                     Q=>"Timer_' + timerCount + '_Finished",');
                 componentsCode.push('                     ET=>"Timer_' + timerCount + '_Elapsed");\n');
                 timerCount++;
@@ -1349,7 +1392,7 @@ function generateCode2(sequence, sensors) {
                     }
                 }
                 ifString = ifString.substr(0, ifString.length - 5);
-                logicCode[0] = logicCode[0] + '\n' + '        IF ' + ifString + ' THEN:';
+                logicCode[0] = logicCode[0] + '\n' + '        IF ' + ifString + ' THEN ';
             }
         }
 
@@ -1359,10 +1402,10 @@ function generateCode2(sequence, sensors) {
         } else if(repeatingCount === currentRepeatingCount) {
             let nextCase = currentCase - 10*repeatingCount - 10;
             if(counterCondition != null) {
-                logicCode.push('                IF Counter_' + countersCount + '_Value = ' + counterCondition + ' THEN:');
+                logicCode.push('                IF Counter_' + countersCount + '_Value < ' + counterCondition + ' THEN ');
                 logicCode.push('                        Counter_' + countersCount + '_Value := Counter_' + countersCount + '_Value + 1;'); // Move to the next case
                 logicCode.push('                        #NEXT := ' + nextCase + ';'); // Move to the next case
-                if(!last) {
+                if(!last || nested) {
                     logicCode.push('                ELSE');
                     logicCode.push('                        #NEXT := ' + currentCase + ';'); // Move to the next case
                 }
@@ -1378,17 +1421,110 @@ function generateCode2(sequence, sensors) {
             currentRepeatingCount++;
         }
 
-        logicCode.push('        #END_IF;'); // Move to the next case
+        logicCode.push('        END_IF;\n'); // Move to the next case
     }
 
-    if(!last) {
+    if(!repeating && !nested) {
         logicCode.splice(logicCode.length - 2, 1);
+    } else if(nested) {
+        let nextCaseIndex = -1;
+        for(let i = logicCode.length - 1; i > 0; i--) {
+            if(logicCode[i].search('#NEXT') !== -1) {
+                nextCaseIndex = i;
+                break;
+            }
+        }
+        logicCode[nextCaseIndex] = logicCode[nextCaseIndex].substr(0, logicCode[nextCaseIndex].search('#NEXT := ')) + '#NEXT := 0;';
+        let ifString = '';
+
+        for(let i = 0; i < previousActuations.length; i++) {
+            const action = previousActuations[i][1];
+            const actuator = previousActuations[i][0];
+
+            if (action === '+') {
+                if(logicCode[0].search('NOT Sensor_' + actuator + '_Retracted') !== -1) {
+                    ifString = 'AND (Sensor_' + actuator + '_Extended AND (NOT Sensor_' + actuator + '_Retracted)) ';
+                }
+            }
+
+            if (action === '-') {
+                if(logicCode[0].search('NOT Sensor_' + actuator + '_Extended') !== -1) {
+                    ifString = 'AND ((NOT Sensor_' + actuator + '_Extended) AND Sensor_' + actuator + '_Retracted) ';
+                }
+            }
+        };
+
+        logicCode[0] = logicCode[0].replace('THEN', ifString + 'THEN')
     }
+
+    logicCode.push('END_CASE;')
+
+    if(lastRepeatingTimer) {
+        console.log(logicCode[0]);
+        logicCode[0] = logicCode[0].replace('THEN', 'AND Timer_' + (timerCount - 1) + '_Finished THEN')
+    }
+
+    const actuatorList = Array.from(actuators);
+
+    let tagCount = 0;
+    let addr = 0;
+    let actions = [];
+    let intCount = 1;
+
+    for(let i = 0; i < actuatorList.length; i++) {
+        actions.push({type: 'Bool', txt: 'Cylinder_'+actuatorList[i]+'_Extend'});
+        actions.push({type: 'Bool', txt: 'Cylinder_'+actuatorList[i]+'_Retract'});
+        actions.push({type: 'Bool', txt: 'Sensor_'+actuatorList[i]+'_Extended'});
+        actions.push({type: 'Bool', txt: 'Sensor_'+actuatorList[i]+'_Retracted'});
+    }
+
+    for(let i = 0; i < timerCount; i++) {
+        actions.push({type: 'Bool', txt: 'Timer_' + i + '_Start'});
+        actions.push({type: 'Bool', txt: 'Timer_' + i + '_Finished'});
+        actions.push({type: 'Time', txt: 'Timer_' + i + '_Elapsed'});
+        setupCode.push('        Timer_' + i + '_Start := FALSE;');
+    }
+
+    for(let i = 1; i <= counters; i++) {
+        actions.push({type: 'Int', txt: 'Counter_' + i + '_Value'});
+        setupCode.push('        Counter_' + i + '_Value := 0;');
+    }
+
+    for(let i = 0; i < actions.length; i++) {
+        if(actions[i].type === 'Bool') {
+            xmlSetup += '<Tag type=\'Bool\' hmiVisible=\'True\' hmiWriteable=\'True\' hmiAccessible=\'True\' retain=\'False\' remark=\'\' addr=\'%M'+addr+'.'+tagCount+'\'>' + actions[i].txt +'</Tag>\n';
+            tagCount++;
+            if(tagCount === 8) {
+                addr++;
+                tagCount = 0;
+            }
+        } else if(actions[i].type === 'Time') {
+            xmlSetup += '<Tag type=\'Time\' hmiVisible=\'True\' hmiWriteable=\'True\' hmiAccessible=\'True\' retain=\'False\' remark=\'\' addr=\'%MD' + (intCount * 100) +'\'>' + actions[i].txt +'</Tag>\n'
+            intCount++;
+        } else if(actions[i].type === 'Int') {
+            xmlSetup += '<Tag type=\'Int\' hmiVisible=\'True\' hmiWriteable=\'True\' hmiAccessible=\'True\' retain=\'False\' remark=\'\' addr=\'%MW' + (intCount * 100) +'\'>' + actions[i].txt +'</Tag>\n'
+            intCount++;
+        }
+    }
+
+    if(isNVarSet) {
+        xmlSetup += '<Tag type=\'Int\' hmiVisible=\'True\' hmiWriteable=\'True\' hmiAccessible=\'True\' retain=\'False\' remark=\'\' addr=\'%MW' + (intCount * 100) +'\'>N_VARIABLE</Tag>\n'
+        intCount++;
+    }
+
+    if(isTVarSet) {
+        xmlSetup += '<Tag type=\'Int\' hmiVisible=\'True\' hmiWriteable=\'True\' hmiAccessible=\'True\' retain=\'False\' remark=\'\' addr=\'%MW' + (intCount * 100) +'\'>T_VARIABLE</Tag>\n'
+        intCount++;
+    }
+
+
+
+
+    xmlSetup += '</Tagtable>';
 
     setupCode.push('        #NEXT := 10;\n');
-
     let finalCode = setupCode.join('\n') + '\n\n' + logicCode.join('\n') + '\n\n' + componentsCode.join('\n');
-    return finalCode;
+    return {code: finalCode, tags: xmlSetup};
 }
 
 module.exports = app

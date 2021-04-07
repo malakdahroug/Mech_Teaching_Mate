@@ -1,0 +1,615 @@
+// A set of cases containing code (instructions) for various states of the program.
+CASE #NEXT OF
+        // The initial state of the program that sets initial values and prepares the program for sorting operations.
+    0:
+        "workpieceCube" := FALSE;
+        "workpieceCylinder" := FALSE;
+        "workpieceTallCylinder" := FALSE;
+        "CylinderHeadExtend" := FALSE;
+        "CylinderHeadRetract" := TRUE;
+        "CubeLimit" := FALSE;
+        "RandomComponent" := FALSE;
+        "CylinderLimit" := FALSE;
+        "TallCylinderLimit" := FALSE;
+        "WorkpieceLimit" := FALSE;
+        "tallCylinderHeadExtend" := FALSE;
+        "tallCylinderHeadRetract" := TRUE;
+        "conveyorLongConstSpeed" := FALSE;
+        "conveyorLongVarSpeed" := FALSE;
+        "conveyorShortConstSpeed" := FALSE;
+        "conveyorShortVarSpeed" := FALSE;
+        "TransitionFinished" := FALSE;
+        "WorkpieceTransition" := FALSE;
+        "CylinderTimerFinihsed" := FALSE;
+        "CylinderTimerON" := FALSE;
+        "CubeTimerON" := FALSE;
+        "CubeTimerFinished" := FALSE;
+        "TallCylinderTimerOn" := FALSE;
+        "TallCylinderTimerFinshed" := FALSE;
+        "CylinderHeadExtendTimerOn" := FALSE;
+        "TallCylinderHeadExtendTimerOn" := FALSE;
+        "CylinderCount" := 0;
+        "CubeCount" := 0;
+        "TallCylinderCount" := 0;
+        "NextObject" := 0;
+        "StopIssued" := FALSE;
+        "WorkpieceOnLongConveyor" := FALSE;
+        "ShortConveyorConstStarted" := TRUE;
+        "LongConveyorConstStarted" := TRUE;
+
+        // If the value of the variable short conveyor speed is 0 it sets the speed to 50 (default).
+        // It (the program) also sets the default value of the field to 50.
+        IF "HMIshortConveyorSpeed" = 0.0 THEN
+            "HMIshortConveyorSpeed" := 50.0;
+            "conveyorShortVarSpeed_SetSpeed" := 50.0;
+        END_IF;
+
+        // If the value of the variable long conveyor speed is 0 it sets the speed to 50 (default).
+        // It also sets the default value of the field to 50.
+        IF "HMIlongConveyorSpeed" = 0.0 THEN
+            "HMIlongConveyorSpeed" := 50.0;
+            "conveyorLongVarSpeed_SetSpeed" := 50.0;
+        END_IF;
+
+        #NEXT := 5;
+
+    // Case that checks for user's initial action.
+    5:
+        // Checks if there was a change in the conveyor operation mode and sets it accordingly (for the short conveyor).
+        IF "ShortConveyorConstStarted" THEN
+            "ShortConveyorConst" := TRUE;
+        ELSE
+            "ShortConveyorConst" := FALSE;
+            "conveyorShortVarSpeed_SetSpeed" := "HMIshortConveyorSpeed";
+        END_IF;
+
+        // Checks if there was a change in the conveyor operation mode and sets it accordingly (for the long conveyor).
+        IF "LongConveyorConstStarted" THEN
+            "LongConveyorConst" := TRUE;
+        ELSE
+            "LongConveyorConst" := FALSE;
+            "conveyorLongVarSpeed_SetSpeed" := "HMIlongConveyorSpeed";
+        END_IF;
+
+        // If the cube button is pressed it sets 'NextObject' to 1 (cube) and moves to case 20.
+        IF "HMIcubeButton" THEN
+            "NextObject" := 1;
+            "RandomComponent" := FALSE;
+            // If the small cylinder button is pressed it sets 'NextObject' to 2 (small cylinder) and moves to case 20.
+        ELSIF "HMIcylinderButton" THEN
+            "NextObject" := 2;
+            "RandomComponent" := FALSE;
+            // If the tall cylinder button is pressed it sets 'NextObject' to 3 (tall cylinder) and moves to case 20.
+        ELSIF "HMItallCylinderButton" THEN
+            "NextObject" := 3;
+            "RandomComponent" := FALSE;
+        ELSIF "HMIrandomButton" THEN
+            "RandomComponent" := TRUE;
+            // If the start button is pressed without the user choosing a specific workpiece, it sets Random workpiece operation mode
+            // and moves to case 10.
+        ELSIF "HMIstartButton" THEN
+            IF NOT ("NextObject" = 1) AND NOT ("NextObject" = 2) AND NOT ("NextObject" = 3) THEN
+                "RandomComponent" := TRUE;
+                #NEXT := 10;
+            ELSE
+                #NEXT := 20;
+            END_IF;
+        END_IF;
+
+        // Case responsible for starting the sequence if no specific workpiece to source was selected.
+    10:
+        // If the Start button is pressed, then random opeation is confirmed - the sequence gets started.
+        // Depedning on the 'ShortConveyorConst' tag the short conveyor will start in constant or variable speed
+        // operation mode.
+        // The 'SortingStarted' flag will be set to true - it indicates the sorting plant started its operation.
+        // It generates a random number between 1 - 3 and moves to the case 50.
+        IF "HMIstartButton" THEN
+
+            IF "ShortConveyorConst" THEN
+                "conveyorShortConstSpeed" := TRUE;
+                "conveyorShortVarSpeed" := FALSE;
+            ELSE
+                "conveyorShortConstSpeed" := FALSE;
+                "conveyorShortVarSpeed" := TRUE;
+            END_IF;
+
+            "SortingStarted" := TRUE;
+            "NextObject" := DINT_TO_INT(FLOOR((("TimeTck" MOD 5) / 2)) + 1);
+            #NEXT := 50;
+        END_IF;
+
+        // If the HMI start button is pressed then the 'SortingStarted' flag will be set to true, indicating the sorting plant started its operation.
+        // It moves to the case 50.
+    20:
+        IF "HMIstartButton" THEN
+            "SortingStarted" := TRUE;
+            #NEXT := 50;
+        END_IF;
+
+        // Initially all workpiece tags are set to false - it makes sure that no workpiece object gets sourced if stop was issued.
+        // It retracts all pistons.
+        // It checks if the conveyor operation mode for both conveyors were set to constant or variable speed and it updates them accordingly.
+        // It also updates the operation speed if the variable speed was set.
+        // If Soft Stop was issued it stops sorting.
+        // Otherwise, it checks the value of the 'NextObject' tag and if the corresponding container is not full then it sources the corresponding workpiece.
+        // It checks if the coveyor operation mode is variable or constant for the Short conveyor and starts it in the mode set.
+        // It sets 'SortingStarted' to true.
+        // Finally it will move to the case 60.
+    50:
+        "workpieceCube" := FALSE;
+        "workpieceCylinder" := FALSE;
+        "workpieceTallCylinder" := FALSE;
+
+        // Makes sure all pistons are retracted.
+        "tallCylinderHeadExtend" := FALSE;
+        "tallCylinderHeadRetract" := TRUE;
+        "CylinderHeadExtend" := FALSE;
+        "CylinderHeadRetract" := TRUE;
+
+        // Checks if there was a change in the conveyor operation mode and sets it accordingly (for the short conveyor).
+        IF "ShortConveyorConstStarted" THEN
+            "ShortConveyorConst" := TRUE;
+        ELSE
+            "ShortConveyorConst" := FALSE;
+            "conveyorShortVarSpeed_SetSpeed" := "HMIshortConveyorSpeed";
+        END_IF;
+
+        // Checks if there was a change in the conveyor operation mode and sets it accordingly (for the long conveyor).
+        IF "LongConveyorConstStarted" THEN
+            "LongConveyorConst" := TRUE;
+        ELSE
+            "LongConveyorConst" := FALSE;
+            "conveyorLongVarSpeed_SetSpeed" := "HMIlongConveyorSpeed";
+        END_IF;
+
+        // Checks if soft stop was issued, if it was then it stops the sequence by moving to case 0.
+        IF "StopIssued" THEN
+            #NEXT := 0;
+            // If soft stop was not issued it will source the right workpiece.
+        ELSE
+            // Checks if there's no workpiece on the long conveyor - workpiece will only be sourced if the long conveyor
+            // is empty (there are no workpieces on it).
+            IF NOT "WorkpieceOnLongConveyor" THEN
+                // Checks if the next workpiece is the cube and the Cube container is not full.
+                IF ("NextObject" = 1) AND NOT "CubeLimit" THEN
+                    "workpieceCube" := TRUE;
+                    "workpieceCylinder" := FALSE;
+                    "workpieceTallCylinder" := FALSE;
+
+                    IF "ShortConveyorConst" THEN
+                        "conveyorShortConstSpeed" := TRUE;
+                        "conveyorShortVarSpeed" := FALSE;
+                    ELSE
+                        "conveyorShortConstSpeed" := FALSE;
+                        "conveyorShortVarSpeed" := TRUE;
+                    END_IF;
+
+                    "SortingStarted" := TRUE;
+                    #NEXT := 60;
+                    // Checks if the next workpiece is the small cylinder and the small cylinder container is not full.
+                ELSIF ("NextObject" = 2) AND NOT "CylinderLimit" THEN
+                    "workpieceCube" := FALSE;
+                    "workpieceCylinder" := TRUE;
+                    "workpieceTallCylinder" := FALSE;
+                    IF "ShortConveyorConst" THEN
+                        "conveyorShortConstSpeed" := TRUE;
+                        "conveyorShortVarSpeed" := FALSE;
+                    ELSE
+                        "conveyorShortConstSpeed" := FALSE;
+                        "conveyorShortVarSpeed" := TRUE;
+                    END_IF;
+                    "SortingStarted" := TRUE;
+                    #NEXT := 60;
+                    // Checks if the next workpiece is the tall cylinder and the tall cylinder container is not full.
+                ELSIF ("NextObject" = 3) AND NOT "TallCylinderLimit" THEN
+                    "workpieceCube" := FALSE;
+                    "workpieceCylinder" := FALSE;
+                    "workpieceTallCylinder" := TRUE;
+                    IF "ShortConveyorConst" THEN
+                        "conveyorShortConstSpeed" := TRUE;
+                        "conveyorShortVarSpeed" := FALSE;
+                    ELSE
+                        "conveyorShortConstSpeed" := FALSE;
+                        "conveyorShortVarSpeed" := TRUE;
+                    END_IF;
+                    "SortingStarted" := TRUE;
+                    #NEXT := 60;
+                END_IF;
+            END_IF;
+        END_IF;
+
+        // Firstly, it retracts all pistons.
+        // It checks if a workpiece is detected by the sensor at the end of the short conveyor.
+        // It resets all timers by setting their control tags and output tags to FALSE.
+        // It sets the 'WorkpieceTransition' tag to true which starts the transition timer.
+        // It checks the operation mode of the long conveyor (constant / variable) and starts it.
+        // Finally it moves to case 65.
+    60:
+        // Makes sure all pistons are retracted
+        "tallCylinderHeadExtend" := FALSE;
+        "tallCylinderHeadRetract" := TRUE;
+        "CylinderHeadExtend" := FALSE;
+        "CylinderHeadRetract" := TRUE;
+        // It checks if a workpiece gets to the end of the short conveyor.
+        IF "lightSensorWorkpiece" THEN
+            // Resets all timer control and output tags.
+            "CylinderTimerFinihsed" := FALSE;
+            "CylinderTimerON" := FALSE;
+            "CubeTimerON" := FALSE;
+            "CubeTimerFinished" := FALSE;
+            "TallCylinderTimerOn" := FALSE;
+            "TallCylinderTimerFinshed" := FALSE;
+            "CylinderHeadExtendTimerOn" := FALSE;
+            "TallCylinderHeadExtendTimerOn" := FALSE;
+
+            // Starts the transition timer.
+            "WorkpieceTransition" := TRUE;
+
+            // Checks the operation mode of the long conveyor and starts it in the corresponding mode.
+            IF "LongConveyorConst" THEN
+                "conveyorLongConstSpeed" := TRUE;
+                "conveyorLongVarSpeed" := FALSE;
+            ELSE
+                "conveyorLongConstSpeed" := FALSE;
+                "conveyorLongVarSpeed" := TRUE;
+            END_IF;
+
+            #NEXT := 65;
+        END_IF;
+
+        // Checks if the transition from short to long conveyor finished, if it did it stops the short conveyor
+        // and it moves to case 70.
+    65:
+        IF "TransitionFinished" THEN
+            "conveyorShortConstSpeed" := FALSE;
+            "conveyorShortVarSpeed" := FALSE;
+            #NEXT := 70;
+        END_IF;
+
+        // Resets workpiece transition timer.
+        // Checks which workpiece is on the conveyor and performs the corresponding sorting operations.
+        // It also increases the count for the workpiece detected.
+        // Finally it moves to the case 80 (for tall and small cylinders) or 75 for the cube.
+    70:
+        "WorkpieceTransition" := FALSE;
+
+        // If tall cylinder is detected.
+        IF "lightSensorTallCylinder" THEN
+            "TallCylinderTimerOn" := TRUE;
+            "TallCylinderCount" := "TallCylinderCount" + 1; // Increases tall cylinder count.
+            #NEXT := 80;
+        END_IF;
+
+        // If small cylinder is detected.
+        IF "lightSensorCylinder" THEN
+            "CylinderTimerON" := TRUE;
+            "CylinderCount" := "CylinderCount" + 1; // Increases small cylinder count.
+            #NEXT := 80;
+        END_IF;
+
+        // If cube is detected
+        IF "lightSensorCube" THEN
+            "CubeTimerON" := TRUE;
+            "CubeCount" := "CubeCount" + 1; // Increases cube count.
+            #NEXT := 75;
+        END_IF;
+
+        // It checks if the cube timer finished.
+        // If it did it stops the long conveyor and moves to the final case 200.
+    75:
+        IF "CubeTimerFinished" THEN
+            "conveyorLongConstSpeed" := FALSE;
+            "conveyorLongVarSpeed" := FALSE;
+            #NEXT := 200;
+        END_IF;
+
+        // It checks if the small cylinder or the tall cylinder timers have finished.
+        // If either of them did it stops the long conveyor and extends the correct corresponding piston.
+        // Finally it moves to case 90 for tall cylinder or 100 for short cylinder.
+    80:
+        // If the tall cylinder timer has finished.
+        IF "TallCylinderTimerFinshed" THEN
+            "conveyorLongConstSpeed" := FALSE;
+            "conveyorLongVarSpeed" := FALSE;
+            "tallCylinderHeadRetract" := FALSE;
+            "tallCylinderHeadExtend" := TRUE;
+            #NEXT := 90;
+        END_IF;
+
+        // If the short cylinder timer has finished.
+        IF "CylinderTimerFinihsed" THEN
+            "conveyorLongConstSpeed" := FALSE;
+            "conveyorLongVarSpeed" := FALSE;
+            "CylinderHeadRetract" := FALSE;
+            "CylinderHeadExtend" := TRUE;
+            #NEXT := 100;
+        END_IF;
+
+        // It waits until the Tall Cylinder timer finishes and starts the second piston extension timer.
+        // Finally it moves to case 110.
+    90:
+        IF "TallCylinderTimerFinshed" THEN
+            "TallCylinderHeadExtendTimerOn" := TRUE;
+            #NEXT := 110;
+        END_IF;
+
+        // It waits until the Small Cylinder timer finishes and starts the first piston extension timer.
+        // Finally it moves to case 120.
+    100:
+        IF "CylinderTimerFinihsed" THEN
+            "CylinderHeadExtendTimerOn" := TRUE;
+            #NEXT := 120;
+        END_IF;
+
+        // If the second piston extension timer has finished it moves to case 200.
+    110:
+        IF "TallCylinderExtended" THEN
+            #NEXT := 200;
+        END_IF;
+
+        // If the first piston extension timer has finished it moves to case 200.
+    120:
+        IF "CylinderExtended" THEN
+            #NEXT := 200;
+        END_IF;
+
+        // Final case that retracts all pistons, resets all timers and their outputs.
+        // It starts the short conveyor, it stops the long conveyor.
+        // If the 'RandomComponent' flag is set to true it generates a number between 1 - 3 and stores it in 'NextObject'.
+        // Finally, it jumps back to case 50.
+    200:
+        "tallCylinderHeadExtend" := FALSE;
+        "tallCylinderHeadRetract" := TRUE;
+        "CylinderHeadExtend" := FALSE;
+        "CylinderHeadRetract" := TRUE;
+        "TransitionFinished" := FALSE;
+        "WorkpieceTransition" := FALSE;
+        "CylinderTimerFinihsed" := FALSE;
+        "CylinderTimerON" := FALSE;
+        "CubeTimerON" := FALSE;
+        "CubeTimerFinished" := FALSE;
+        "TallCylinderTimerOn" := FALSE;
+        "TallCylinderTimerFinshed" := FALSE;
+        "CylinderHeadExtendTimerOn" := FALSE;
+        "CylinderHeadRetract" := FALSE;
+        "TallCylinderHeadExtendTimerOn" := FALSE;
+        "tallCylinderHeadRetract" := FALSE;
+
+        // Checks if the short conveyor is in constant or variable speed operation mode and
+        // It starts the short conveyor in this mode.
+        IF "ShortConveyorConst" THEN
+            "conveyorShortConstSpeed" := TRUE;
+            "conveyorShortVarSpeed" := FALSE;
+        ELSE
+            "conveyorShortConstSpeed" := FALSE;
+            "conveyorShortVarSpeed" := TRUE;
+        END_IF;
+
+        // Stops long conveyors.
+        "conveyorLongVarSpeed" := FALSE;
+        "conveyorLongConstSpeed" := FALSE;
+
+        // Checks if random component should be generated, if it should then it generates a random number (between 1-3).
+        IF "RandomComponent" THEN
+            "NextObject" := DINT_TO_INT(FLOOR((("TimeTck" MOD 5) / 2)) + 1);
+        END_IF;
+
+        #NEXT := 50;
+END_CASE;
+
+// Transition timer
+"IEC_Timer_0_DB".TON(IN := "WorkpieceTransition",
+                     PT := "TransitionTimerDelay",
+                     Q => "TransitionFinished");
+
+// Small cylinder timer
+"IEC_Timer_0_DB_1".TON(IN := "CylinderTimerON",
+                       PT := "ShortCylinderTimerDelay",
+                       Q => "CylinderTimerFinihsed");
+
+// Cube timer
+"IEC_Timer_0_DB_2".TON(IN := "CubeTimerON",
+                       PT := T#2s,
+                       Q => "CubeTimerFinished");
+
+// Tall cylinder timer
+"IEC_Timer_0_DB_3".TON(IN := "TallCylinderTimerOn",
+                       PT := "TallCylinderTimerDelay",
+                       Q => "TallCylinderTimerFinshed");
+
+// Cylinder extension timer
+"IEC_Timer_0_DB_4".TON(IN := "CylinderHeadExtendTimerOn",
+                       PT := T#850ms,
+                       Q => "CylinderExtended");
+
+// Tall cylinder extension timer
+"IEC_Timer_0_DB_5".TON(IN := "TallCylinderHeadExtendTimerOn",
+                       PT := T#850ms,
+                       Q => "TallCylinderExtended");
+
+// checks if the cube count is greater than or equal to 4 (its capacity).
+// If it is it will prevent Cubes from being sourced.
+IF "CubeCount" >= 4 THEN
+    "CubeLimit" := TRUE;
+END_IF;
+
+// checks if the tall cylinder count is greater than or equal to 3 (its capacity).
+// If it is it will prevent tall cylinders from being sourced.
+IF "TallCylinderCount" >= 3 THEN
+    "TallCylinderLimit" := TRUE;
+END_IF;
+
+// checks if the small cylinder count is greater than or equal to 15 (its capacity).
+// If it is it will prevent small cylinders from being sourced.
+IF "CylinderCount" >= 15 THEN
+    "CylinderLimit" := TRUE;
+END_IF;
+
+// checks if a workpiece reaches the sensor at the end of the short conveyor.
+// 'WorkpieceOnLongConveyor' tag is set to true.
+IF "WorkpieceTransition" THEN
+    "WorkpieceOnLongConveyor" := TRUE;
+END_IF;
+
+// If the sorting of any workpiece is finished.
+// 'WorkpieceOnLongConveyor' tag is set to false.
+IF "CubeTimerFinished" OR "TallCylinderTimerFinshed" OR "CylinderTimerFinihsed" THEN
+    "WorkpieceOnLongConveyor" := FALSE;
+END_IF;
+
+// If a workpiece is on the long conveyor then no workpiece can be sourced.
+IF "WorkpieceOnLongConveyor" THEN
+    "workpieceCube" := FALSE;
+    "workpieceCylinder" := FALSE;
+    "workpieceTallCylinder" := FALSE;
+END_IF;
+
+// If any of the workpieces' containers reached their capacity it disables 'RandomComponent' sourcing and
+// sets 'WorkpieceLimit' to true.
+IF "CubeLimit" OR "CylinderLimit" OR "TallCylinderLimit" THEN
+    "WorkpieceLimit" := TRUE;
+    "RandomComponent" := FALSE;
+END_IF;
+
+// If the Restarted button in the HMI is pressed (it is only visible when any of the workpiece containers have reached their capacity).
+// It will reset all the limit flags (for each of the components and the Workpiece Limit flag).
+// It will reset all of the workpiece counters.
+IF "HMIemptiedButton" THEN
+    "CubeLimit" := FALSE;
+    "CylinderLimit" := FALSE;
+    "TallCylinderLimit" := FALSE;
+    "WorkpieceLimit" := FALSE;
+    "CubeCount" := 0;
+    "CylinderCount" := 0;
+    "TallCylinderCount" := 0;
+END_IF;
+
+// If sorting was not started and the long conveyor constant speed button was pressed on the HMI
+// It will set flags for constant speed (long conveyor) to true.
+IF "HMIconvLongConstButton" AND NOT "SortingStarted" THEN
+    "LongConveyorConst" := TRUE;
+    "LongConveyorConstStarted" := TRUE;
+END_IF;
+
+// If sorting was not started and the long conveyor variable speed button was pressed on the HMI
+// It will set flags for constant speed (long conveyor) to false.
+IF "HMIconvLongVarButton" AND NOT "SortingStarted" THEN
+    "LongConveyorConst" := FALSE;
+    "LongConveyorConstStarted" := FALSE;
+END_IF;
+
+// If sorting was not started and the short conveyor constant speed button was pressed on the HMI
+// It will set flags for constant speed (short conveyor) to true.
+IF "HMIconvShortConstButton" AND NOT "SortingStarted" THEN
+    "ShortConveyorConst" := TRUE;
+    "ShortConveyorConstStarted" := TRUE;
+END_IF;
+
+// If sorting was not started and the short conveyor variable speed button was pressed on the HMI
+// It will set flags for constant speed (short conveyor) to false.
+IF "HMIconvShortVarButton" AND NOT "SortingStarted" THEN
+    "ShortConveyorConst" := FALSE;
+    "ShortConveyorConstStarted" := FALSE;
+END_IF;
+
+// If sorting started and the long conveyor constant speed button was pressed on the HMI
+// It will only set 'LongConveyorConstStarted' flag to true.
+// Having two separate flags will allow the change to take effect from the next iteration.
+IF "HMIconvLongConstButton" AND "SortingStarted" THEN
+    "LongConveyorConstStarted" := TRUE;
+END_IF;
+
+// If the sorting started and the long conveyor variable speed button was pressed on the HMI
+// It will only set 'LongConveyorConstStarted' flag to false.
+// Having two separate flags will allow the change to take effect from the next iteration.
+IF "HMIconvLongVarButton" AND "SortingStarted" THEN
+    "LongConveyorConstStarted" := FALSE;
+END_IF;
+
+// If the sorting started and the short conveyor constant speed button was pressed on the HMI
+// It will only set 'ShortConveyorConstStarted' flag to true.
+// Having two separate flags will allow the change to take effect from the next iteration.
+IF "HMIconvShortConstButton" AND "SortingStarted" THEN
+    "ShortConveyorConstStarted" := TRUE;
+END_IF;
+
+// If the sorting started and the short conveyor variable speed button was pressed on the HMI
+// It will only set 'ShortConveyorConstStarted' flag to false.
+// Having two separate flags will allow the change to take effect from the next iteration.
+IF "HMIconvShortVarButton" AND "SortingStarted" THEN
+    "ShortConveyorConstStarted" := FALSE;
+END_IF;
+
+// If the long conveyor is in variable speed operation mode.
+// It will workout the timer modifier and modify delays for timers.
+IF "conveyorLongVarSpeed" THEN
+    // Formula that works out the ratio between the given variable speed and the constant speed.
+    // It is used as a divider for delays to work out the right delay.
+    "TimeModLong" := "conveyorLongVarSpeed_SetSpeed" / 50.0;
+    // If it is not 0 (it prevents the accidental division by 0)
+    IF NOT ("TimeModLong" = 0.0) THEN
+        "TallCylinderTimerDelay" := INT_TO_TIME(REAL_TO_INT(2800.0 / "TimeModLong")); // Delay for the Tall Cylinder timer.
+        "ShortCylinderTimerDelay" := INT_TO_TIME(REAL_TO_INT(1000.0 / "TimeModLong")); // Delay for the Small Cylinder timer.
+    END_IF;
+// If the long conveyor operates in the constant speed mode it just sets the initially given values as the delay.
+ELSE
+    "TallCylinderTimerDelay" := INT_TO_TIME(REAL_TO_INT(2800.0)); // Delay for the Tall Cylinder timer.
+    "ShortCylinderTimerDelay" := INT_TO_TIME(REAL_TO_INT(1000.0)); // Delay for the Small Cylinder timer.
+END_IF;
+// If the short conveyor is in variable speed operation mode
+// It will workout the timer modifier and modify delays for the timer.
+IF "conveyorShortVarSpeed" THEN
+    // Formula that works out the ratio between the given variable speed and the constant speed.
+    // It is used as a divider for delays to work out the right delay.
+    "TimeModShort" := "conveyorShortVarSpeed_SetSpeed" / 50.0;
+    // If it is not 0 (it prevents the accidental division by 0)
+    IF NOT ("TimeModShort" = 0.0) THEN
+        "TransitionTimerDelay" := INT_TO_TIME(REAL_TO_INT(750.0 / "TimeModShort")); // Transition timer
+    END_IF;
+// If the short conveyor operates in the constant speed mode it just sets the initially given values as the delay.
+ELSE
+    "TransitionTimerDelay" := INT_TO_TIME(REAL_TO_INT(750.0)); // Transition timer
+END_IF;
+
+// If the sorting is started and the HMI Cube button is pressed it disables the Random Operation mode
+// It assigns 1 to the 'NextObject' tag which resolves to cube.
+IF "SortingStarted" AND "HMIcubeButton" THEN
+    "NextObject" := 1;
+    "RandomComponent" := FALSE;
+END_IF;
+
+// If the sorting is started and the HMI Small Cylinder button is pressed it disables the Random Operation mode
+// It assigns 2 to the 'NextObject' tag which resolves to small cylinder.
+IF "SortingStarted" AND "HMIcylinderButton" THEN
+    "NextObject" := 2;
+    "RandomComponent" := FALSE;
+END_IF;
+
+// If the sorting is started and the HMI Tall Cylinder button is pressed it disables the Random Operation mode
+// It assigns 3 to the 'NextObject' tag which resolves to tall cylinder.
+IF "SortingStarted" AND "HMItallCylinderButton" THEN
+    "NextObject" := 3;
+    "RandomComponent" := FALSE;
+END_IF;
+
+// If the HMI Random button is pressed it enables the Random Operation mode.
+IF "HMIrandomButton" THEN
+    "RandomComponent" := TRUE;
+END_IF;
+
+
+// Works out the time in miliseconds since the PLC was started and converts it to an unsigned integer.
+// It is used to generate random numbers.
+"TimeTck" := TIME_TO_UINT(TIME_TCK());
+
+// If the HMI Hard Stop button is pressed it sets the 'SortingStarted' flag to false
+// And it jumps to case 0 which resets all the components to their initial states.
+IF "HMIstopButton" THEN
+    "SortingStarted" := FALSE;
+    #NEXT := 0;
+END_IF;
+
+// If the HMI Soft Stop button is pressed it sets the 'StopIssued' flag to true.
+IF "HMIsoftStopButton" THEN
+    "StopIssued" := TRUE;
+END_IF;
