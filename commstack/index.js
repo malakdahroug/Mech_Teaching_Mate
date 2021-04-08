@@ -107,6 +107,32 @@ async function main(sequence, ip) {
         let repeatTarget = -1;
         let repeatDifference = -1;
 
+        let tempSequence = [...sequence];
+        let nested = false;
+
+        if(tempSequence[0].search(/\[/) !== -1 && tempSequence[tempSequence.length - 1].search(/]/) !== -1) {
+            tempSequence[0] = tempSequence[0].replace('[', '');
+            tempSequence[tempSequence.length - 1] = tempSequence[tempSequence.length - 1].replace(']', '');
+            for(let i = 0; i < tempSequence.length; i++) {
+                if(tempSequence[i].search(/\[/) !== -1) {
+                    nested = true;
+                    break;
+                }
+
+                if(tempSequence[i].search(/]/) !== -1) {
+                    nested = false;
+                    break;
+                }
+            }
+        }
+
+        if(nested) {
+            sequence[0] = sequence[0].replace('[', '');
+            sequence[sequence.length - 1] = sequence[sequence.length - 1].substr(0, sequence[sequence.length - 1].length - 1);
+        }
+
+        tempSequence = [...sequence];
+
         for(let i = 0; i < sequence.length; i++) {
             const plcStatus = plcList.find((e) => {
                 return e.ip === ip;
@@ -172,6 +198,16 @@ async function main(sequence, ip) {
                     repeatTarget = -1;
                     repeatDifference = -1;
                 }
+
+                if(nested && i === sequence.length - 1) {
+                    sequence = tempSequence;
+                    i = -1;
+                    repeatStart = -1;
+                    repeatCount = -1;
+                    repetitions = -1;
+                    repeatTarget = -1;
+                    repeatDifference = -1;
+                }
                 continue;
             }
 
@@ -191,6 +227,18 @@ async function main(sequence, ip) {
 
             let previousCompleted = await checkActuators(session, previousActuators);
             while(!previousCompleted) {
+                if(plcStatus.stopSignal) {
+                    plc.state = true;
+                    plc.stopSignal = false;
+
+                    await session.close();
+                    await client.disconnect();
+                    console.log("done !");
+
+                    plc.state = true;
+                    plcList[plcIndex] = plc;
+                    return;
+                }
                 previousCompleted = await checkActuators(session, previousActuators);
             }
 
@@ -224,6 +272,16 @@ async function main(sequence, ip) {
             }
 
             if(repetitions !== -1 && repeatCount === repetitions) {
+                repeatStart = -1;
+                repeatCount = -1;
+                repetitions = -1;
+                repeatTarget = -1;
+                repeatDifference = -1;
+            }
+
+            if(nested && i === sequence.length - 1) {
+                sequence = tempSequence;
+                i = -1;
                 repeatStart = -1;
                 repeatCount = -1;
                 repetitions = -1;
