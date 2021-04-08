@@ -8,6 +8,9 @@ import {
     ClientMonitoredItem, DataType,
 } from "node-opcua";
 
+import express from 'express';
+const app = express();
+
 const connectionStrategy = {
     initialDelay: 1000,
     maxRetry: 1
@@ -21,10 +24,26 @@ const options = {
 };
 const client = OPCUAClient.create(options);
 // const endpointUrl = "opc.tcp://opcuademo.sterfive.com:26543";
-const endpointUrl = "opc.tcp://192.168.0.44:4840";
-async function main() {
+
+console.log('Started');
+
+let plcList = [
+    {name: 'PLC_1', ip: '192.168.0.242', state: true}
+];
+
+async function main(sequence, ip) {
     try {
+        const plc = plcList.find((e) => {
+            return e.ip === ip;
+        });
+        const plcIndex = plcList.indexOf(plc);
+        plc.state = false;
+        plcList[plcIndex] = plc;
+
+        // 192.168.0.242
+        const endpointUrl = 'opc.tcp://' + ip + ':4840';
         // step 1 : connect to
+        console.log('Connecting');
         await client.connect(endpointUrl);
         console.log("connected !");
 
@@ -32,21 +51,163 @@ async function main() {
         const session = await client.createSession();
         console.log("session created !");
 
-        // step 3 : browse
-        const browseResult = await session.browse("RootFolder");
+        // // step 3 : browse
+        // const browseResult = await session.browse("RootFolder");
+        // //
+        // console.log(browseResult.references[0]);
+        // let dataValue2 = await session.readVariableValue("ns=3;s=\"Cylinder_A_Extend\"");
+        // console.log(" value = ", dataValue2.toString());
 
-        console.log("references of RootFolder :");
-        for(const reference of browseResult.references) {
-            console.log( "   -> ", reference.browseName.toString());
+        let previous = {actuator: '', action: ''};
+        let state = {ret: null, ext: null};
+
+        const tVar = [{
+            nodeId: 'ns=3;s=\"T_VARIABLE\"',
+            attributeId: AttributeIds.Value,
+            indexRange: null,
+            value: {
+                value: {
+                    dataType: "Int16",
+                    value: 3
+                }
+            }
+        }];
+
+        await session.write(tVar, (err, res) => {
+            console.log('Executing');
+            console.log(err)
+            console.log(res)
+        });
+
+        for(let i = 0; i < sequence.length; i++) {
+            await session.write(retract(sequence[i][0]), (err, res) => {
+                console.log('Executing');
+            });
         }
 
-        console.log(browseResult.references[0]);
-        let dataValue2 = await session.readVariableValue("ns=3;s=\"Cylinder_A_Extend\"");
-        console.log(" value = " , dataValue2.toString());
+        await sleep(300);
 
-        const nodesToWrite = [];
-        nodesToWrite.push({
-            nodeId: 'ns=3;s=\"Cylinder_A_Extend\"',
+        for(let i = 0; i < sequence.length; i++) {
+            const timerMatch = sequence[i].match(/((((T\+)?(([0-9].[0-9]+)|([1-9]+[0-9]*)|([1-9]+[0-9]*.[0-9]+)))S)|TS)*/i);
+            if (timerMatch && timerMatch[0] !== '') {
+                let time = 0;
+                if(sequence[i].search('T') !== -1) {
+                    if(sequence[i].search(/\+/) !== -1) {
+                        // Read T and add number
+                        const tValue = (await session.readVariableValue("ns=3;s=\"T_VARIABLE\"")).value.value;
+                        time = (parseInt(sequence[i].replaceAll('T', '').replaceAll('+', '').replaceAll('S', '')) + tValue) * 1000;
+                        console.log(time);
+                    } else {
+                        time = (await session.readVariableValue("ns=3;s=\"T_VARIABLE\"")).value.value;
+                    }
+                } else {
+                    time = parseInt(sequence[i].replaceAll('T', '').replaceAll('+', '').replaceAll('S', '')) * 1000;
+                }
+
+
+                await sleep(time);
+                continue;
+            }
+
+            if(previous.actuator && previous.actuator) {
+                state.ext = (await session.readVariableValue("ns=3;s=\"Sensor_" + previous.actuator + "_Extended\"")).value.value;
+                state.ret = (await session.readVariableValue("ns=3;s=\"Sensor_" + previous.actuator + "_Retracted\"")).value.value;
+            }
+
+
+            let action = [];
+
+            if(previous.action === '-') {
+                while(!state.ret){
+                    state.ext = (await session.readVariableValue("ns=3;s=\"Sensor_" + previous.actuator + "_Extended\"")).value.value;
+                    state.ret = (await session.readVariableValue("ns=3;s=\"Sensor_" + previous.actuator + "_Retracted\"")).value.value;
+                }
+            } else if(previous.action === '+') {
+                while(!state.ext){
+                    state.ext = (await session.readVariableValue("ns=3;s=\"Sensor_" + previous.actuator + "_Extended\"")).value.value;
+                    state.ret = (await session.readVariableValue("ns=3;s=\"Sensor_" + previous.actuator + "_Retracted\"")).value.value;
+                }
+            }
+
+            if(sequence[i][1] === '-') {
+                action = retract(sequence[i][0]);
+            } else if(sequence[i][1] === '+') {
+                action = extend(sequence[i][0]);
+            }
+
+            await session.write(action, (err, res) => {
+            });
+
+            previous.actuator = sequence[i][0];
+            previous.action = sequence[i][1];
+
+            // await sleep(500);
+        }
+
+        // for(let i = 0; i < 5; i++) {
+        //     await session.write(retract('A'), (err, res) => {
+        //         console.log('Retracting');
+        //     });
+        //
+        //     await sleep(1000);
+        //
+        //     await session.write(extend('A'), (err, res) => {
+        //         console.log('Extending');
+        //     });
+        //     await sleep(1000);
+        // }
+
+
+        // session.dataValue2 = await session.readVariableValue("ns=3;s=\"Cylinder_A_Extend\"");
+
+
+        // close session
+        await session.close();
+
+        // disconnecting
+        await client.disconnect();
+        console.log("done !");
+        plc.state = true;
+        plcList[plcIndex] = plc;
+
+    } catch (err) {
+        console.log("An error has occured : ", err);
+    }
+}
+
+app.get('/sequence/:sequence/:ip', async (req, res) => {
+    let sequence = req.params.sequence.toUpperCase().replaceAll(/\s/g, "").split(',');
+    let ip = req.params.ip;
+    const plc = plcList.find((e) => {return e.ip === ip});
+    if(plc && plc.state) {
+        main(sequence, ip);
+        res.send('Executing');
+    } else {
+        res.send('Chosen PLC is currently busy!');
+    }
+});
+
+app.listen(3005);
+
+
+function sleep(ms) {
+    return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+function retract(cylinder) {
+    return [{
+        nodeId: 'ns=3;s=\"Cylinder_' + cylinder +'_Extend\"',
+        attributeId: AttributeIds.Value,
+        indexRange: null,
+        value: {
+            value: {
+                dataType: "Boolean",
+                value: false
+            }
+        }
+    },
+        {
+            nodeId: 'ns=3;s=\"Cylinder_' + cylinder +'_Retract\"',
             attributeId: AttributeIds.Value,
             indexRange: null,
             value: {
@@ -55,101 +216,32 @@ async function main() {
                     value: true
                 }
             }
-        });
-
-        await session.write(nodesToWrite, (err, res) => {
-            console.log(err, res);
-        });
-
-        session.
-        dataValue2 = await session.readVariableValue("ns=3;s=\"Cylinder_A_Extend\"");
-        console.log(" value = " , dataValue2.toString());
-
-        // step 4 : read a variable with readVariableValue
-        // const dataValue2 = await session.readVariableValue("ns=3;s=Scalar_Simulation_Double");
-        // console.log(" value = " , dataValue2.toString());
-        //
-        // // step 4' : read a variable with read
-        // const maxAge = 0;
-        // const nodeToRead = {
-        //     nodeId: "ns=0;s=Test",
-        //     attributeId: AttributeIds.Value
-        // };
-        // const dataValue =  await session.read(nodeToRead, maxAge);
-        // console.log(" value " , dataValue.toString());
-
-
-
-        // step 5: install a subscription and install a monitored item for 10 seconds
-        // const subscription = ClientSubscription.create(session, {
-        //     requestedPublishingInterval: 1000,
-        //     requestedLifetimeCount:      100,
-        //     requestedMaxKeepAliveCount:   10,
-        //     maxNotificationsPerPublish:  100,
-        //     publishingEnabled: true,
-        //     priority: 10
-        // });
-        //
-        // subscription.on("started", function() {
-        //     console.log("subscription started for 2 seconds - subscriptionId=", subscription.subscriptionId);
-        // }).on("keepalive", function() {
-        //     console.log("keepalive");
-        // }).on("terminated", function() {
-        //     console.log("terminated");
-        // });
-        //
-        //
-        // // install monitored item
-        //
-        // const itemToMonitor = {
-        //     nodeId: "ns=3;s=Scalar_Simulation_Float",
-        //     attributeId: AttributeIds.Value
-        // };
-        // const parameters = {
-        //     samplingInterval: 100,
-        //     discardOldest: true,
-        //     queueSize: 10
-        // };
-        //
-        // const monitoredItem  = ClientMonitoredItem.create(
-        //     subscription,
-        //     itemToMonitor,
-        //     parameters,
-        //     TimestampsToReturn.Both
-        // );
-        //
-        // monitoredItem.on("changed", (dataValue) => {
-        //     console.log(" value has changed : ", dataValue.value.toString());
-        // });
-        //
-        //
-        //
-        // async function timeout(ms) {
-        //     return new Promise(resolve => setTimeout(resolve, ms));
-        // }
-        // await timeout(10000);
-        //
-        // console.log("now terminating subscription");
-        // await subscription.terminate();
-
-
-
-        // step 6: finding the nodeId of a node by Browse name
-        const browsePath = makeBrowsePath("RootFolder", "/Objects/Server.ServerStatus.BuildInfo.ProductName");
-
-        const result = await session.translateBrowsePath(browsePath);
-        const productNameNodeId = result.targets[0].targetId;
-        console.log(" Product Name nodeId = ", productNameNodeId.toString());
-
-        // close session
-        await session.close();
-
-        // disconnecting
-        await client.disconnect();
-        console.log("done !");
-    } catch(err) {
-        console.log("An error has occured : ",err);
-    }
+        }
+    ]
 }
 
-main();
+function extend(cylinder) {
+    return [{
+        nodeId: 'ns=3;s=\"Cylinder_' + cylinder +'_Retract\"',
+        attributeId: AttributeIds.Value,
+        indexRange: null,
+        value: {
+            value: {
+                dataType: "Boolean",
+                value: false
+            }
+        }
+    },
+        {
+        nodeId: 'ns=3;s=\"Cylinder_' + cylinder +'_Extend\"',
+        attributeId: AttributeIds.Value,
+        indexRange: null,
+        value: {
+            value: {
+                dataType: "Boolean",
+                value: true
+            }
+        }
+    }
+    ]
+}

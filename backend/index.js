@@ -1460,7 +1460,6 @@ function generateCode2(sequence, sensors) {
     logicCode.push('END_CASE;')
 
     if(lastRepeatingTimer) {
-        console.log(logicCode[0]);
         logicCode[0] = logicCode[0].replace('THEN', 'AND Timer_' + (timerCount - 1) + '_Finished THEN')
     }
 
