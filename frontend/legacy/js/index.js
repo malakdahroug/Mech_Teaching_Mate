@@ -52,17 +52,16 @@ function showSolution() {
 }
 
 function generate2() {
-    const checkbox = (document.getElementById('withSensors').checked ? '1' : '0');
     const errors = document.getElementById('withFaults').value;
     document.getElementById('correct_code').innerHTML = 'Generating...';
     document.getElementById('incorrect_code').innerHTML = 'Generating...';
-    fetch('http://localhost:3000/sequence/generate2/' + document.getElementById('sequence').value + '/1')
+    fetch('http://localhost:3000/sequence/generate2/' + document.getElementById('sequence').value + '/' + errors + '/607738cae78eaf87f8452a24')
         .then(o => o.json())
         .then(response => {
             console.log(response);
             document.getElementById('solutionButton').innerText = 'Show solution';
             document.getElementById('correct_code').innerHTML = '\nSOLUTION:\n\n' + response.msg.code.toString();
-            document.getElementById('incorrect_code').innerHTML = '\nTAG SETUP:\n\n' + response.msg.tags.toString();
+            //document.getElementById('incorrect_code').innerHTML = '\nTAG SETUP:\n\n' + response.msg.tags.toString();
             document.getElementById('correct_code').style.float = 'left';
             document.getElementById('incorrect_code').style.float = 'right';
             document.getElementById('correct_code').style.display = 'inline-block';

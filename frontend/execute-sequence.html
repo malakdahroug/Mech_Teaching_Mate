@@ -14,60 +14,38 @@
           href="https://unpkg.com/bootstrap-material-design@4.1.1/dist/css/bootstrap-material-design.min.css"
           integrity="sha384-wXznGJNEXNG1NFsbm0ugrLFMQPWswR3lds2VeinahP8N0zJw9VWSopbjv2x7WCvX" crossorigin="anonymous">
 </head>
-<body onLoad="setup('generator');">
+<body onLoad="setup('execute-sequence');">
 <nav class="navbar navbar-expand-lg navbar-light bg-primary pad20" id="nav"></nav>
 <div id="modals"></div>
 <div class="container content">
     <div class="row bg-light pad1">
         <div class="col-lg">
-            <h2 class="page-title">Code generator</h2>
+            <h2 class="page-title">Simulated PLC</h2>
             <form class="form-signin text-center">
                 <label for="sequence" class="sr-only">Sequence:</label>
                 <input type="text" id="sequence" class="form-control margin-b-2" placeholder="Sequence">
-
-                <label for="withFaults">Errors to generate:</label>
-                <select id="withFaults" class="form-control margin-b-2" placeholder="Full name">
-                    <option value="0,none">None</option>
-                    <option value="1,easy">Easy</option>
-                    <option value="1,medium">Medium</option>
-                    <option value="1,hard">Hard</option>
-                </select><br>
+                <label for="available">Available PLCs:</label>
+                <select id="available" class="form-control margin-b-2">
+                    <option value="">Please choose PLC</option>
+                </select>
                 <div class="error" id="sequenceError"></div>
             </form>
             <div class="text-center">
-                <button class="btn btn-lg btn-primary" onClick="generate();">Generate code</button>
+                <button class="btn btn-lg btn-primary" onClick="executeSequence();">Start execution</button>
                 </button>
-                <br><br>
             </div>
-
-            <pre><code id="incorrect_code"></code></pre>
+            <hr>
+            <form class="form-signin text-center">
+                <label for="unavailable">Unavailable PLCs:</label>
+                <select id="unavailable" class="form-control margin-b-2">
+                    <option value="">Please choose PLC</option>
+                </select>
+                <div class="error" id="plcError"></div>
+            </form>
             <div class="text-center">
-                <button class="btn btn-sm btn-primary" onClick="copyText('incorrect_code');" id="incorrectCodeBtn">Copy
-                    code with errors to clipboard
+                <button class="btn btn-lg btn-primary" onClick="stopPLC();">Stop execution</button>
                 </button>
             </div>
-            <div class="text-center">
-                <button class="btn btn-lg btn-primary" onClick="showSolution();" id="solutionButton">Show solution
-                </button>
-                <br><br>
-            </div>
-
-            <pre><code id="correct_code"></code></pre>
-            <div class="text-center">
-                <button class="btn btn-sm btn-primary" onClick="copyText('correct_code');" id="correctCodeBtn">Copy
-                    Solution to clipboard
-                </button>
-            </div>
-
-            <pre lang="xml"><code id="xmlTags" disabled></code></pre>
-
-            <div class="text-center">
-                <button class="btn btn-sm btn-primary" onClick="copyText('xmlTags');" id="xmlTagsBtn">Copy XML Tags to
-                    clipboard
-                </button>
-            </div>
-
-
         </div>
     </div>
 </div>

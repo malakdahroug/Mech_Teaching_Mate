@@ -45,15 +45,14 @@ const ActuatorConfig = mongoose.model('ActuatorConfig', {
 const TimerConfig = mongoose.model('TimerConfig', {
     project_id: String,
     label: String,
-    resetTag: String,
-    completedTag: String
+    powerTag: String,
+    completedTag: String,
+    elapsedTimeTag: String
 });
 const CounterConfig = mongoose.model('CounterConfig', {
     project_id: String,
     label: String,
-    resetTag: String,
-    completedTag: String,
-    currentValueTag: String
+    counterVar: String
 });
 
 // DATABASE SCHEMAS END
@@ -251,8 +250,9 @@ app.post('/project/config/add', async function (req, res) {
             const newTimer = new TimerConfig({
                 project_id: projectID,
                 label: elementLabel,
-                resetTag: req.body.resetTag,
-                completedTag: req.body.completedTag
+                powerTag: req.body.powerTag,
+                completedTag: req.body.completedTag,
+                elapsedTimeTag: req.body.elapsedTimeTag
             });
 
             newTimer.save().then(async () => {
@@ -274,9 +274,7 @@ app.post('/project/config/add', async function (req, res) {
             const newCounter = new CounterConfig({
                 project_id: projectID,
                 label: elementLabel,
-                resetTag: req.body.resetTag,
-                completedTag: req.body.completedTag,
-                currentValueTag: req.body.currentValueTag
+                counterVar: req.body.counterVar
             });
 
             newCounter.save().then(async () => {
@@ -494,7 +492,7 @@ app.get('/sequence/generate/:sequence/:sensorsPresent/:withFaults', function (re
 });
 
 // Sequence validation route
-app.get('/sequence/generate2/:sequence/:sensors', function (req, res) {
+app.get('/sequence/generate2/:sequence/:errors/:projectID?', async function (req, res) {
     // Temporary Cross Origin workaround
     res.header("Access-Control-Allow-Origin", "*");
     res.setHeader('Content-Type', 'application/json');
@@ -504,7 +502,14 @@ app.get('/sequence/generate2/:sequence/:sensors', function (req, res) {
     const sequenceValidator = isValid([...sequence]);
 
     if (sequenceValidator.length === 0) {
-        res.send({status: 'OK', msg: generateCode2(sequence, (req.params.sensors === '1'))});
+        const projectConfigID = await ProjectConfig.findOne({project_id: req.params.projectID}).exec();
+
+        if (projectConfigID) {
+            const code = await generateCode2(sequence, projectConfigID._id.toString(), req.params.errors);
+            res.send({status: 'OK', msg: code});
+        } else {
+            res.send({status: 'OK', msg: {code: 'Please make sure project is fully configured!'}});
+        }
     } else {
         res.send({status: 'Error', msg: sequenceValidator});
     }
@@ -644,7 +649,7 @@ function getElementType(element) {
 
     // Tries to match a string to the regular expression provided
     const matchActuator = element.search(actuator);
-    if (matchActuator !== -1) {
+    if (matchActuator !== -1 && element.search('T') === -1) {
         types.actuator = true;
     }
 
@@ -1115,12 +1120,164 @@ function generateCode(sequence, q, sensors, faults, complexity) {
     return outputCode;
 }
 
-function generateCode2(sequence, sensors) {
+function generateErrors(code, complexity, actuators) {
+    actuators = Array.from(actuators);
+    let logicCode = [...code];
+    // Setting initial value of faultsLimit to 0, it will be amended depending on complexity chosen
+    // Using a formulae from the next set of if - else-if statements
+    let faultsLimit = 0;
+
+    // Current number of errors generated
+    let faultsCount = 0;
+    if (complexity === 'easy') {
+        faultsLimit = Math.ceil(logicCode.length / 5);
+    } else if (complexity === 'medium') {
+        faultsLimit = Math.ceil(logicCode.length / 4);
+    } else if (complexity === 'hard') {
+        faultsLimit = Math.ceil(logicCode.length / 3);
+    }
+
+    // If number of generated faults is less than a limit - it will keep repeating until it generates enough errors
+    while (faultsCount < faultsLimit) {
+
+        // It will keep iterating through logicCode array
+        for (let i = 0; i < logicCode.length; i++) {
+
+            // Checks if enough faults were generated already, if so - it will break the loop as well as condition
+            // of the while loop won't be satisfied anymore
+            if (faultsCount >= faultsLimit) {
+                break;
+            }
+
+            // Generates a pseudo random number between 0 and 10,
+            // if the number is smaller than 3 (which maps to roughly 30% chances of error being generated in that line)
+            // it will then generate an error
+            if (Math.floor(Math.random() * 10) < 3) {
+                // Generates a random number between 0 and 2 to decide which type of fault to include
+                // - 0 -> will shift line of code 2 lines forward (for the last 3 lines it will shift them 2 lines backward)
+                // - 1 -> it will remove up to 3 characters from the end of the string
+                // - 2 -> it will completely remove the line of code
+                // - 3 -> it will swap TRUE to FALSE and FALSE to TRUE
+                // - 4 -> it will modify the IF statement to be incorrect (missing conditions)
+                let faultOption = Math.floor(Math.random() * 6);
+                switch (faultOption) {
+                    case 0:
+                        let currentElement = logicCode[i];
+                        if (i >= logicCode.length - 3) {
+                            logicCode[i] = logicCode[i - 2];
+                            logicCode[i - 2] = currentElement;
+                        } else {
+                            logicCode[i] = logicCode[i + 2];
+                            logicCode[i + 2] = currentElement;
+                        }
+                        break;
+                    case 1:
+                        logicCode[i] = logicCode[i].substring(0, logicCode[i].length - Math.ceil(Math.random() * 3));
+                        break;
+                    case 2:
+                        logicCode.splice(i, 1);
+                        break;
+                    case 3:
+                        for(let j = i; j < logicCode.length; j++) {
+                            let opt = Math.round(Math.random());
+                            let currentLine = logicCode[j].search((opt === 0 ? 'TRUE' : 'FALSE'));
+                            if(currentLine !== -1) {
+                                logicCode[j] = logicCode[j].replace((opt === 0 ? 'TRUE' : 'FALSE'), (opt === 0 ? 'FALSE' : 'TRUE'));
+                                break;
+                            }
+                        }
+                        break;
+                    case 4:
+                        for(let j = i; j < logicCode.length; j++) {
+                            let currentLine = logicCode[j].search('IF');
+                            if(currentLine !== -1) {
+                                let next = logicCode[j].search('AND');
+                                if(next !== -1) {
+                                    logicCode[j] = logicCode[j].substr(0, currentLine + 4) + logicCode[j].substr(next + 4, logicCode[j].length);
+                                    break;
+                                } else {
+                                    continue;
+                                }
+                            }
+                        }
+                        break;
+                    case 5:
+                        let randomActuator = Math.floor(Math.random() * 4);
+                        let randomActuator2 = Math.floor(Math.random() * 4);
+
+                        while(randomActuator === randomActuator2) {
+                            randomActuator2 = Math.floor(Math.random() * 4)
+                        }
+
+                        for(let j = i; j < logicCode.length; j++) {
+                            let currentLine = logicCode[j].search('_' + actuators[randomActuator]);
+                            let currentLineActuator = logicCode[j].search(':=');
+
+                            if(currentLine !== -1 && currentLineActuator !== -1) {
+                                logicCode[j] = logicCode[j].replace('_' + actuators[randomActuator], '_' + actuators[randomActuator2]);
+                                break;
+                            }
+
+                            if(j === logicCode.length - 1) {
+                                j = 0;
+                            }
+                        }
+                        break;
+                }
+
+                // When the fault was generated increment faultCount
+                faultsCount++;
+            }
+        }
+    }
+
+    return logicCode;
+}
+
+async function generateCode2(sequence, projectID, errors) {
     // Initial code (sequence setup) that will contain all the setup info e.g. cylinders retracted, timers reset etc
     let setupCode = [];
 
+    errors = errors.split(',');
+    const errorsPresent = (errors[0] === '0' ? false : true);
+    const errorsComplexity = errors[1];
+
     // Create a set for all actuators
     let actuators = new Set([]);
+
+    const cylinderTypes = ['singleActingSingleTag', 'singleActingDoubleTag', 'doubleActing'];
+
+    let configPresent = false;
+
+    let sequenceElements = [];
+
+    if (projectID) {
+        const projectConfiguration = await ProjectConfig.findOne({_id: projectID.trim()});
+        if (projectConfiguration) {
+            configPresent = true;
+        } else {
+            return {code: 'Project does not exist! Please make sure project is configured and exists!'};
+        }
+
+        const unassigned = getUnassignedComponents(getComponents(sequence), projectConfiguration);
+
+        if (unassigned.length > 0) {
+            return {status: 'Configuration incomplete!'};
+        }
+
+        for (const element of projectConfiguration.assigned_elements) {
+            if (cylinderTypes.indexOf(element.component_type) !== -1) {
+                const elementConfig = await ActuatorConfig.findOne({_id: element.component_id});
+                sequenceElements.push({type: 'actuator', label: element.component_name, config: elementConfig});
+            } else if (element.component_type === 'timer') {
+                const elementConfig = await TimerConfig.findOne({_id: element.component_id});
+                sequenceElements.push({type: 'timer', label: element.component_name, config: elementConfig});
+            } else if (element.component_type === 'counter') {
+                const elementConfig = await CounterConfig.findOne({_id: element.component_id});
+                sequenceElements.push({type: 'counter', label: element.component_name, config: elementConfig});
+            }
+        }
+    }
 
     // Create setup code and case 0, so e.g. all cylinders can start in their desired positions
     setupCode.push('CASE #NEXT OF');
@@ -1133,7 +1290,7 @@ function generateCode2(sequence, sensors) {
     let tempQueue = new queue();
 
     let currentCase = 10;
-    let timerCount = 0;
+    let timerCount = 1;
     let previousActuations = [];
     let repeatingCount = 0;
     let currentRepeatingCount = 0;
@@ -1146,16 +1303,16 @@ function generateCode2(sequence, sensors) {
     let tempSequence = [...sequence];
     let nested = false;
 
-    if(tempSequence[0].search(/\[/) !== -1 && tempSequence[tempSequence.length - 1].search(/]/) !== -1) {
+    if (tempSequence[0].search(/\[/) !== -1 && tempSequence[tempSequence.length - 1].search(/]/) !== -1) {
         tempSequence[0] = tempSequence[0].replace('[', '');
         tempSequence[tempSequence.length - 1] = tempSequence[tempSequence.length - 1].replace(']', '');
-        for(let i = 0; i < tempSequence.length; i++) {
-            if(tempSequence[i].search(/\[/) !== -1) {
+        for (let i = 0; i < tempSequence.length; i++) {
+            if (tempSequence[i].search(/\[/) !== -1) {
                 nested = true;
                 break;
             }
 
-            if(tempSequence[i].search(/]/) !== -1) {
+            if (tempSequence[i].search(/]/) !== -1) {
                 nested = false;
                 break;
             }
@@ -1163,7 +1320,7 @@ function generateCode2(sequence, sensors) {
     }
 
 
-    if(nested) {
+    if (nested) {
         sequence[0] = sequence[0].replace('[', '');
         sequence[sequence.length - 1] = sequence[sequence.length - 1].substr(0, sequence[sequence.length - 1].length - 1);
 
@@ -1182,19 +1339,19 @@ function generateCode2(sequence, sensors) {
         let resetTimer = [];
         // Add current case count
 
-        if(current.search(/\[/) !== -1) {
+        if (current.search(/\[/) !== -1) {
             countersCount++;
             current = current.replace(/\[/, '');
 
-            for(let i = 0; i < sequence.length; i++) {
+            for (let i = 0; i < sequence.length; i++) {
                 repeatingCount++;
-                if(sequence[i].search(/]/) !== -1) {
-                    if(sequence[i].search(/]\^N\+/) !== -1) {
+                if (sequence[i].search(/]/) !== -1) {
+                    if (sequence[i].search(/]\^N\+/) !== -1) {
                         counterCondition = '(N_VARIABLE + ' + sequence[i].substr(sequence[i].search(/]\^N\+/) + 4) + ')';
                         isNVarSet = true;
                         counters++;
                         sequence[i] = sequence[i].substr(0, sequence[i].search(/]\^N\+/));
-                    } else if(sequence[i].search(/]\^/) !== -1) {
+                    } else if (sequence[i].search(/]\^/) !== -1) {
                         counterCondition = sequence[i].substr(sequence[i].search(/]\^/) + 2);
                         counters++;
                         sequence[i] = sequence[i].substr(0, sequence[i].search(/]\^/));
@@ -1211,13 +1368,42 @@ function generateCode2(sequence, sensors) {
             let ifString = '';
             while (previousActuations.length > 0) {
                 const cur = previousActuations.splice(0, 1)[0];
+                let actuatorTag = {};
+                if (cur[1] !== '!') {
+                    if (configPresent) {
+                        const actuatorConfig = sequenceElements.find((e) => {
+                            return e.label === cur[0];
+                        });
+                        actuatorTag.extSns = actuatorConfig.config.extSnsTag;
+                        actuatorTag.retSns = actuatorConfig.config.retSnsTag;
+                        actuatorTag.ext = actuatorConfig.config.extTag;
+                        actuatorTag.ret = actuatorConfig.config.retTag;
+                    } else {
+                        actuatorTag.extSns = 'Sensor_' + cur[0] + '_Extended';
+                        actuatorTag.retSns = 'Sensor_' + cur[0] + '_Retracted';
+                        actuatorTag.ext = 'Cylinder_' + cur[0] + '_Extend';
+                        actuatorTag.ret = 'Cylinder_' + cur[0] + '_Retract';
+                    }
+                }
                 if (cur[1] === '-') {
-                    ifString += '((NOT Sensor_' + cur[0] + '_Extended) AND Sensor_' + cur[0] + '_Retracted) AND ';
+                    ifString += '((NOT ' + actuatorTag.extSns + ') AND ' + actuatorTag.retSns + ') AND ';
                 } else if (cur[1] === '+') {
-                    ifString += '(Sensor_' + cur[0] + '_Extended AND (NOT Sensor_' + cur[0] + '_Retracted)) AND ';
+                    ifString += '(' + actuatorTag.extSns + ' AND (NOT ' + actuatorTag.retSns + ')) AND ';
                 } else if (cur[1] === '!') {
-                    ifString += '(Timer_' + cur[2] + '_Finished) AND ';
-                    resetTimer.push('                Timer_' + cur[2] + '_Start := TRUE;'); // Retract cylinder
+                    let timerTag = {};
+                    if (configPresent) {
+                        const timerConfig = sequenceElements.find((e) => {
+                            return e.label === 'Timer_' + cur[2];
+                        });
+                        timerTag.completed = timerConfig.config.completedTag;
+                        timerTag.power = timerConfig.config.powerTag;
+                    } else {
+                        timerTag.completed = 'Timer_' + cur[2] + '_Finished';
+                        timerTag.power = 'Timer_' + cur[2] + '_Start';
+                    }
+
+                    ifString += '(' + timerTag.completed + ') AND ';
+                    resetTimer.push('                ' + timerTag.power + ' := TRUE;'); // Retract cylinder
                 }
             }
             ifString = ifString.substr(0, ifString.length - 5);
@@ -1231,7 +1417,7 @@ function generateCode2(sequence, sensors) {
             tempQueue.enqueue(current.substr(1, current.length));
             while (true) {
                 const element = sequence[0];
-                if(element) {
+                if (element) {
                     repeatingCount--;
                     if (element.search(/\)/) !== -1) {
                         const temp = sequence.splice(0, 1)[0];
@@ -1256,22 +1442,40 @@ function generateCode2(sequence, sensors) {
                     const actuator = tempCurrent[0];
                     const action = tempCurrent[1];
 
+                    let actuatorTag = {};
+                    if (configPresent) {
+                        const actuatorConfig = sequenceElements.find((e) => {
+                            return e.label === actuator;
+                        });
+                        actuatorTag.extSns = actuatorConfig.config.extSnsTag;
+                        actuatorTag.retSns = actuatorConfig.config.retSnsTag;
+                        actuatorTag.ext = actuatorConfig.config.extTag;
+                        actuatorTag.ret = actuatorConfig.config.retTag;
+
+
+                    } else {
+                        actuatorTag.extSns = 'Sensor_' + cur[0] + '_Extended';
+                        actuatorTag.retSns = 'Sensor_' + cur[0] + '_Retracted';
+                        actuatorTag.ext = 'Cylinder_' + actuator + '_Extend';
+                        actuatorTag.ret = 'Cylinder_' + actuator + '_Retract';
+                    }
+
                     if (!actuators.has(actuator)) {
                         actuators.add(actuator); // Add to set
-                        setupCode.push('        Cylinder_' + actuator + '_Extend := FALSE;'); // Retract cylinder
-                        setupCode.push('        Cylinder_' + actuator + '_Retract := TRUE;'); // Retract cylinder
+                        setupCode.push('        ' + actuatorTag.ext + ' := FALSE;'); // Retract cylinder
+                        setupCode.push('        ' + actuatorTag.ret + ' := TRUE;'); // Retract cylinder
                     }
 
                     if (action === '-') {
-                        logicCode.push('                Cylinder_' + actuator + '_Extend := FALSE;'); // Retract cylinder
-                        logicCode.push('                Cylinder_' + actuator + '_Retract := TRUE;'); // Retract cylinder
-                        ifString = ' AND (Sensor_' + actuator + '_Extended AND (NOT Sensor_' + actuator + '_Retracted)) THEN ';
+                        logicCode.push('                ' + actuatorTag.ext + ' := FALSE;'); // Retract cylinder
+                        logicCode.push('                ' + actuatorTag.ret + ' := TRUE;'); // Retract cylinder
+                        ifString = ' AND (' + actuatorTag.extSns + ' AND (NOT ' + actuatorTag.retSns + ')) THEN ';
                     }
 
                     if (action === '+') {
-                        logicCode.push('                Cylinder_' + actuator + '_Retract := FALSE;'); // Extend cylinder
-                        logicCode.push('                Cylinder_' + actuator + '_Extend := TRUE;'); // Extend cylinder
-                        ifString = ' AND ((NOT Sensor_' + actuator + '_Extended) AND Sensor_' + actuator + '_Retracted) THEN ';
+                        logicCode.push('                ' + actuatorTag.ret + ' := FALSE;'); // Extend cylinder
+                        logicCode.push('                ' + actuatorTag.ext + ' := TRUE;'); // Extend cylinder
+                        ifString = ' AND ((NOT ' + actuatorTag.extSns + ') AND ' + actuatorTag.retSns + ') THEN ';
                     }
 
                     if (currentCase !== 10) {
@@ -1287,7 +1491,17 @@ function generateCode2(sequence, sensors) {
 
                 if (timerMatch && timerMatch[0] !== '') {
                     previousActuations.push('!!' + timerCount);
-                    logicCode.push('                Timer_' + timerCount + '_Start := TRUE;');
+
+                    let timerTag = {};
+                    if (configPresent) {
+                        const timerConfig = sequenceElements.find((e) => {
+                            return e.label === 'Timer_' + timerCount;
+                        });
+                        timerTag.power = timerConfig.config.powerTag;
+                    } else {
+                        timerTag.power = 'Timer_' + timerCount + '_Start';
+                    }
+                    logicCode.push('                ' + timerTag.power + ' := TRUE;');
                     let time = '';
                     let currentTime = tempCurrent;
 
@@ -1303,11 +1517,24 @@ function generateCode2(sequence, sensors) {
                         time = currentTime;
                     }
 
+                    let timer = {};
+                    if (configPresent) {
+                        const timerConfig = sequenceElements.find((e) => {
+                            return e.label === 'Timer_' + timerCount;
+                        });
+                        timer.power = timerConfig.config.powerTag;
+                        timer.completed = timerConfig.config.completedTag;
+                        timer.elapsedTime = timerConfig.config.elapsedTimeTag;
+                    } else {
+                        timer.power = 'Timer_' + timerCount + '_Start';
+                        timer.completed = 'Timer_' + timerCount + '_Finished';
+                        timer.elapsedTime = 'Timer_' + timerCount + '_Elapsed';
+                    }
 
-                    componentsCode.push('"IEC_Timer_' + timerCount + '_DB".TON(IN:="Timer_' + timerCount + '_Start",');
+                    componentsCode.push('"IEC_Timer_' + (timerCount - 1) + '_DB".TON(IN:="' + timer.power + '",');
                     componentsCode.push('                     PT:=t#' + time + ',');
-                    componentsCode.push('                     Q=>"Timer_' + timerCount + '_Finished",');
-                    componentsCode.push('                     ET=>"Timer_' + timerCount + '_Elapsed");\n');
+                    componentsCode.push('                     Q=>"' + timer.completed + '",');
+                    componentsCode.push('                     ET=>"' + timer.elapsedTime + '");\n');
                     timerCount++;
                 }
             }
@@ -1321,22 +1548,38 @@ function generateCode2(sequence, sensors) {
                 const actuator = current[0];
                 const action = current[1];
 
+                let actuatorTag = {};
+                if (configPresent) {
+                    const actuatorConfig = sequenceElements.find((e) => {
+                        return e.label === actuator;
+                    });
+                    actuatorTag.extSns = actuatorConfig.config.extSnsTag;
+                    actuatorTag.retSns = actuatorConfig.config.retSnsTag;
+                    actuatorTag.ext = actuatorConfig.config.extTag;
+                    actuatorTag.ret = actuatorConfig.config.retTag;
+                } else {
+                    actuatorTag.extSns = 'Sensor_' + actuator + '_Extended';
+                    actuatorTag.retSns = 'Sensor_' + actuator + '_Retracted';
+                    actuatorTag.ext = 'Cylinder_' + actuator + '_Extend';
+                    actuatorTag.ret = 'Cylinder_' + actuator + '_Retract';
+                }
+
                 if (!actuators.has(actuator)) {
                     actuators.add(actuator); // Add to set
-                    setupCode.push('        Cylinder_' + actuator + '_Extend := FALSE;'); // Retract cylinder
-                    setupCode.push('        Cylinder_' + actuator + '_Retract := TRUE;'); // Retract cylinder
+                    setupCode.push('        ' + actuatorTag.ext + ' := FALSE;'); // Retract cylinder
+                    setupCode.push('        ' + actuatorTag.ret + ' := TRUE;'); // Retract cylinder
                 }
 
                 if (action === '-') {
-                    logicCode.push('                Cylinder_' + actuator + '_Extend := FALSE;'); // Retract cylinder
-                    logicCode.push('                Cylinder_' + actuator + '_Retract := TRUE;'); // Retract cylinder
-                    ifString = ' AND (Sensor_' + actuator + '_Extended AND (NOT Sensor_' + actuator + '_Retracted)) THEN ';
+                    logicCode.push('                ' + actuatorTag.ext + ' := FALSE;'); // Retract cylinder
+                    logicCode.push('                ' + actuatorTag.ret + ' := TRUE;'); // Retract cylinder
+                    ifString = ' AND (' + actuatorTag.extSns + ' AND (NOT ' + actuatorTag.retSns + ')) THEN ';
                 }
 
                 if (action === '+') {
-                    logicCode.push('                Cylinder_' + actuator + '_Retract := FALSE;'); // Extend cylinder
-                    logicCode.push('                Cylinder_' + actuator + '_Extend := TRUE;'); // Extend cylinder
-                    ifString = ' AND ((NOT Sensor_' + actuator + '_Extended) AND Sensor_' + actuator + '_Retracted) THEN ';
+                    logicCode.push('                ' + actuatorTag.ret + ' := FALSE;'); // Extend cylinder
+                    logicCode.push('                ' + actuatorTag.ext + ' := TRUE;'); // Extend cylinder
+                    ifString = ' AND ((NOT ' + actuatorTag.extSns + ') AND ' + actuatorTag.retSns + ') THEN ';
                 }
 
                 if (currentCase !== 10) {
@@ -1351,9 +1594,23 @@ function generateCode2(sequence, sensors) {
                 previousActuations.push(current);
             }
 
+            let timerTag = {};
+            if (configPresent) {
+                const timerConfig = sequenceElements.find((e) => {
+                    return e.label === 'Timer_' + timerCount;
+                });
+                timerTag.power = timerConfig.config.powerTag;
+                timerTag.completed = timerConfig.config.completedTag;
+                timerTag.elapsedTime = timerConfig.config.elapsedTimeTag;
+            } else {
+                timerTag.power = 'Timer_' + timerCount + '_Start';
+                timerTag.completed = 'Timer_' + timerCount + '_Finished';
+                timerTag.elapsedTime = 'Timer_' + timerCount + '_Elapsed';
+            }
+
             if (timerMatch && timerMatch[0] !== '') {
                 previousActuations.push('!!' + timerCount);
-                logicCode.push('                Timer_' + timerCount + '_Start := TRUE;');
+                logicCode.push('                ' + timerTag.power + ' := TRUE;');
 
                 let time = '';
                 let variableTime = false;
@@ -1374,11 +1631,10 @@ function generateCode2(sequence, sensors) {
 
                 time += currentTime;
 
-
-                componentsCode.push('"IEC_Timer_' + timerCount + '_DB".TON(IN:="Timer_' + timerCount + '_Start",');
+                componentsCode.push('"IEC_Timer_' + (timerCount - 1) + '_DB".TON(IN:="' + timerTag.power + '",');
                 componentsCode.push('                     PT:=t#' + time + ',');
-                componentsCode.push('                     Q=>"Timer_' + timerCount + '_Finished",');
-                componentsCode.push('                     ET=>"Timer_' + timerCount + '_Elapsed");\n');
+                componentsCode.push('                     Q=>"' + timerTag.completed + '",');
+                componentsCode.push('                     ET=>"' + timerTag.elapsedTime + '");\n');
                 timerCount++;
             }
         }
@@ -1388,7 +1644,19 @@ function generateCode2(sequence, sensors) {
                 for (let i = 0; i < previousActuations.length; i++) {
                     const cur = previousActuations[i];
                     if (cur[1] !== '!') {
-                        ifString += '((NOT Sensor_' + cur[0] + '_Extended) AND Sensor_' + cur[0] + '_Retracted) AND ';
+                        let actuatorTag = {};
+                        if (configPresent) {
+                            const actuatorConfig = sequenceElements.find((e) => {
+                                return e.label === cur[0];
+                            });
+                            actuatorTag.extSns = actuatorConfig.config.extSnsTag;
+                            actuatorTag.retSns = actuatorConfig.config.retSnsTag;
+                        } else {
+                            actuatorTag.extSns = 'Sensor_' + cur[0] + '_Extended';
+                            actuatorTag.retSns = 'Sensor_' + cur[0] + '_Retracted';
+                        }
+
+                        ifString += '((NOT ' + actuatorTag.extSns + ') AND ' + actuatorTag.retSns + ') AND ';
                     }
                 }
                 ifString = ifString.substr(0, ifString.length - 5);
@@ -1397,15 +1665,26 @@ function generateCode2(sequence, sensors) {
         }
 
         currentCase += 10;
-        if(repeatingCount === 0) {
+        if (repeatingCount === 0) {
             logicCode.push('                #NEXT := ' + currentCase + ';'); // Move to the next case
-        } else if(repeatingCount === currentRepeatingCount) {
-            let nextCase = currentCase - 10*repeatingCount - 10;
-            if(counterCondition != null) {
-                logicCode.push('                IF Counter_' + countersCount + '_Value < ' + counterCondition + ' THEN ');
-                logicCode.push('                        Counter_' + countersCount + '_Value := Counter_' + countersCount + '_Value + 1;'); // Move to the next case
+        } else if (repeatingCount === currentRepeatingCount) {
+            let nextCase = currentCase - 10 * repeatingCount - 10;
+            if (counterCondition != null) {
+
+                let counterTag = {};
+                if (configPresent) {
+                    const counterConfig = sequenceElements.find((e) => {
+                        return e.label === 'Counter_' + countersCount;
+                    });
+                    counterTag.counterVar = counterConfig.config.counterVar;
+                } else {
+                    counterTag.counterVar = 'Counter_' + countersCount + '_Value';
+                }
+
+                logicCode.push('                IF ' + counterTag.counterVar + ' < ' + counterCondition + ' THEN ');
+                logicCode.push('                        ' + counterTag.counterVar + ' := ' + counterTag.counterVar + ' + 1;'); // Move to the next case
                 logicCode.push('                        #NEXT := ' + nextCase + ';'); // Move to the next case
-                if(!last || nested) {
+                if (!last || nested) {
                     logicCode.push('                ELSE');
                     logicCode.push('                        #NEXT := ' + currentCase + ';'); // Move to the next case
                 }
@@ -1424,12 +1703,12 @@ function generateCode2(sequence, sensors) {
         logicCode.push('        END_IF;\n'); // Move to the next case
     }
 
-    if(!repeating && !nested) {
+    if (!repeating && !nested) {
         logicCode.splice(logicCode.length - 2, 1);
-    } else if(nested) {
+    } else if (nested) {
         let nextCaseIndex = -1;
-        for(let i = logicCode.length - 1; i > 0; i--) {
-            if(logicCode[i].search('#NEXT') !== -1) {
+        for (let i = logicCode.length - 1; i > 0; i--) {
+            if (logicCode[i].search('#NEXT') !== -1) {
                 nextCaseIndex = i;
                 break;
             }
@@ -1437,30 +1716,54 @@ function generateCode2(sequence, sensors) {
         logicCode[nextCaseIndex] = logicCode[nextCaseIndex].substr(0, logicCode[nextCaseIndex].search('#NEXT := ')) + '#NEXT := 0;';
         let ifString = '';
 
-        for(let i = 0; i < previousActuations.length; i++) {
+        for (let i = 0; i < previousActuations.length; i++) {
             const action = previousActuations[i][1];
             const actuator = previousActuations[i][0];
 
+            let actuatorTag = {};
+            if (action !== '!') {
+                if (configPresent) {
+                    const actuatorConfig = sequenceElements.find((e) => {
+                        return e.label === actuator;
+                    });
+                    actuatorTag.extSns = actuatorConfig.config.extSnsTag;
+                    actuatorTag.retSns = actuatorConfig.config.retSnsTag;
+                } else {
+                    actuatorTag.extSns = 'Sensor_' + actuator + '_Extended';
+                    actuatorTag.retSns = 'Sensor_' + actuator + '_Retracted';
+                }
+            }
+
             if (action === '+') {
-                if(logicCode[0].search('NOT Sensor_' + actuator + '_Retracted') !== -1) {
-                    ifString = 'AND (Sensor_' + actuator + '_Extended AND (NOT Sensor_' + actuator + '_Retracted)) ';
+                if (logicCode[0].search('NOT ' + actuatorTag.retSns + '') !== -1) {
+                    ifString = 'AND (' + actuatorTag.extSns + ' AND (NOT ' + actuatorTag.retSns + ')) ';
                 }
             }
 
             if (action === '-') {
-                if(logicCode[0].search('NOT Sensor_' + actuator + '_Extended') !== -1) {
-                    ifString = 'AND ((NOT Sensor_' + actuator + '_Extended) AND Sensor_' + actuator + '_Retracted) ';
+                if (logicCode[0].search('NOT ' + actuatorTag.extSns + '') !== -1) {
+                    ifString = 'AND ((NOT ' + actuatorTag.extSns + ') AND ' + actuatorTag.retSns + ') ';
                 }
             }
-        };
+        }
+        ;
 
         logicCode[0] = logicCode[0].replace('THEN', ifString + 'THEN')
     }
 
     logicCode.push('END_CASE;')
 
-    if(lastRepeatingTimer) {
-        logicCode[0] = logicCode[0].replace('THEN', 'AND Timer_' + (timerCount - 1) + '_Finished THEN')
+    if (lastRepeatingTimer) {
+        let timerTag = {};
+        if (configPresent) {
+            const timerConfig = sequenceElements.find((e) => {
+                return e.label === 'Timer_' + (timerCount - 1);
+            });
+            timerTag.completed = timerConfig.config.completedTag;
+        } else {
+            timerTag.completed = 'Timer_' + (timerCount - 1) + '_Finished';
+        }
+        logicCode[0] = logicCode[0].replace('THEN', 'AND ' + timerTag.completed + ' THEN')
     }
 
     const actuatorList = Array.from(actuators);
@@ -1470,60 +1773,90 @@ function generateCode2(sequence, sensors) {
     let actions = [];
     let intCount = 1;
 
-    for(let i = 0; i < actuatorList.length; i++) {
-        actions.push({type: 'Bool', txt: 'Cylinder_'+actuatorList[i]+'_Extend'});
-        actions.push({type: 'Bool', txt: 'Cylinder_'+actuatorList[i]+'_Retract'});
-        actions.push({type: 'Bool', txt: 'Sensor_'+actuatorList[i]+'_Extended'});
-        actions.push({type: 'Bool', txt: 'Sensor_'+actuatorList[i]+'_Retracted'});
+    for (let i = 0; i < actuatorList.length; i++) {
+        actions.push({type: 'Bool', txt: 'Cylinder_' + actuatorList[i] + '_Extend'});
+        actions.push({type: 'Bool', txt: 'Cylinder_' + actuatorList[i] + '_Retract'});
+        actions.push({type: 'Bool', txt: 'Sensor_' + actuatorList[i] + '_Extended'});
+        actions.push({type: 'Bool', txt: 'Sensor_' + actuatorList[i] + '_Retracted'});
     }
 
-    for(let i = 0; i < timerCount; i++) {
+    for (let i = 0; i < timerCount - 1; i++) {
+
+        let timerTag = {};
+        if (configPresent) {
+            const timerConfig = sequenceElements.find((e) => {
+                return e.label === 'Timer_' + (i + 1);
+            });
+            timerTag.power = timerConfig.config.powerTag;
+        } else {
+            timerTag.power = 'Timer_' + (i + 1) + '_Start';
+        }
+
         actions.push({type: 'Bool', txt: 'Timer_' + i + '_Start'});
         actions.push({type: 'Bool', txt: 'Timer_' + i + '_Finished'});
         actions.push({type: 'Time', txt: 'Timer_' + i + '_Elapsed'});
-        setupCode.push('        Timer_' + i + '_Start := FALSE;');
+        setupCode.push('        ' + timerTag.power + ' := FALSE;');
     }
 
-    for(let i = 1; i <= counters; i++) {
+    for (let i = 1; i <= counters; i++) {
+
+        let counterTag = {};
+        if (configPresent) {
+            const counterConfig = sequenceElements.find((e) => {
+                return e.label === 'Counter_' + i;
+            });
+            counterTag.counterVar = counterConfig.config.counterVar;
+        } else {
+            counterTag.counterVar = 'Counter_' + i + '_Value';
+        }
+
         actions.push({type: 'Int', txt: 'Counter_' + i + '_Value'});
-        setupCode.push('        Counter_' + i + '_Value := 0;');
+        setupCode.push('        ' + counterTag.counterVar + ' := 0;');
     }
 
-    for(let i = 0; i < actions.length; i++) {
-        if(actions[i].type === 'Bool') {
-            xmlSetup += '<Tag type=\'Bool\' hmiVisible=\'True\' hmiWriteable=\'True\' hmiAccessible=\'True\' retain=\'False\' remark=\'\' addr=\'%M'+addr+'.'+tagCount+'\'>' + actions[i].txt +'</Tag>\n';
+    for (let i = 0; i < actions.length; i++) {
+        if (actions[i].type === 'Bool') {
+            xmlSetup += '<Tag type=\'Bool\' hmiVisible=\'True\' hmiWriteable=\'True\' hmiAccessible=\'True\' retain=\'False\' remark=\'\' addr=\'%M' + addr + '.' + tagCount + '\'>' + actions[i].txt + '</Tag>\n';
             tagCount++;
-            if(tagCount === 8) {
+            if (tagCount === 8) {
                 addr++;
                 tagCount = 0;
             }
-        } else if(actions[i].type === 'Time') {
-            xmlSetup += '<Tag type=\'Time\' hmiVisible=\'True\' hmiWriteable=\'True\' hmiAccessible=\'True\' retain=\'False\' remark=\'\' addr=\'%MD' + (intCount * 100) +'\'>' + actions[i].txt +'</Tag>\n'
+        } else if (actions[i].type === 'Time') {
+            xmlSetup += '<Tag type=\'Time\' hmiVisible=\'True\' hmiWriteable=\'True\' hmiAccessible=\'True\' retain=\'False\' remark=\'\' addr=\'%MD' + (intCount * 100) + '\'>' + actions[i].txt + '</Tag>\n'
             intCount++;
-        } else if(actions[i].type === 'Int') {
-            xmlSetup += '<Tag type=\'Int\' hmiVisible=\'True\' hmiWriteable=\'True\' hmiAccessible=\'True\' retain=\'False\' remark=\'\' addr=\'%MW' + (intCount * 100) +'\'>' + actions[i].txt +'</Tag>\n'
+        } else if (actions[i].type === 'Int') {
+            xmlSetup += '<Tag type=\'Int\' hmiVisible=\'True\' hmiWriteable=\'True\' hmiAccessible=\'True\' retain=\'False\' remark=\'\' addr=\'%MW' + (intCount * 100) + '\'>' + actions[i].txt + '</Tag>\n'
             intCount++;
         }
     }
 
-    if(isNVarSet) {
-        xmlSetup += '<Tag type=\'Int\' hmiVisible=\'True\' hmiWriteable=\'True\' hmiAccessible=\'True\' retain=\'False\' remark=\'\' addr=\'%MW' + (intCount * 100) +'\'>N_VARIABLE</Tag>\n'
+    if (isNVarSet) {
+        xmlSetup += '<Tag type=\'Int\' hmiVisible=\'True\' hmiWriteable=\'True\' hmiAccessible=\'True\' retain=\'False\' remark=\'\' addr=\'%MW' + (intCount * 100) + '\'>N_VARIABLE</Tag>\n'
         intCount++;
     }
 
-    if(isTVarSet) {
-        xmlSetup += '<Tag type=\'Int\' hmiVisible=\'True\' hmiWriteable=\'True\' hmiAccessible=\'True\' retain=\'False\' remark=\'\' addr=\'%MW' + (intCount * 100) +'\'>T_VARIABLE</Tag>\n'
+    if (isTVarSet) {
+        xmlSetup += '<Tag type=\'Int\' hmiVisible=\'True\' hmiWriteable=\'True\' hmiAccessible=\'True\' retain=\'False\' remark=\'\' addr=\'%MW' + (intCount * 100) + '\'>T_VARIABLE</Tag>\n'
         intCount++;
     }
-
-
-
 
     xmlSetup += '</Tagtable>';
 
     setupCode.push('        #NEXT := 10;\n');
+
+    let codeWithErrors = setupCode.join('\n') + '\n\n' + generateErrors(logicCode, errorsComplexity, actuators).join('\n');
+
     let finalCode = setupCode.join('\n') + '\n\n' + logicCode.join('\n') + '\n\n' + componentsCode.join('\n');
-    return {code: finalCode, tags: xmlSetup};
+
+    if (configPresent) {
+        return (errorsPresent ? {code: finalCode, incorrect: codeWithErrors} : {code: finalCode});
+    } else {
+        return (errorsPresent ? {code: finalCode, incorrect: codeWithErrors, tags: xmlSetup} : {
+            code: finalCode,
+            tags: xmlSetup
+        });
+    }
 }
 
 module.exports = app

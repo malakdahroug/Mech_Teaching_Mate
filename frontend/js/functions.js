@@ -1,4 +1,20 @@
 const backend = 'http://localhost:3000';
+const commBackend = 'http://localhost:3005';
+
+let params = window.location.search.substr(1);
+const projectDetails = {id: '', sequence: ''};
+if (params.length > 1) {
+    params = params.split('&');
+    for (const element of params) {
+        const param = element.split('=');
+        if (param[0] === 'pid') {
+            projectDetails.id = param[1];
+        }
+        if (param[0] === 'sequence') {
+            projectDetails.sequence = param[1];
+        }
+    }
+}
 
 const signin = () => {
     const username = document.querySelector('#inputUsernameLogin').value;
@@ -119,6 +135,88 @@ const getProfileData = () => {
         });
 }
 
+const getPLCs = () => {
+    fetch(commBackend + '/plc/get')
+        .then(r => r.json())
+        .then(response => {
+            if (response.status === 'OK') {
+                let availablePLCs = '<option value="">Please choose PLC</option>';
+                let unavailablePLCs = '<option value="">Please choose PLC</option>';
+
+                for(const plc of response.msg) {
+                    if(plc.state) {
+                        availablePLCs += '<option value="' + plc.ip +'">' + plc.name + ' (' + plc.ip + ')</option>';
+                    } else {
+                        unavailablePLCs += '<option value="' + plc.ip +'">' + plc.name + ' (' + plc.ip + ', currently used by ' + plc.currentUser +')</option>';
+                    }
+                }
+
+                document.getElementById('available').innerHTML = availablePLCs;
+                document.getElementById('unavailable').innerHTML = unavailablePLCs;
+            } else {
+                document.querySelector('#sequenceError').innerHTML = 'An internal error occurred! Please try again later!';
+            }
+        });
+}
+
+const executeSequence = () => {
+    const sequence = document.getElementById('sequence').value;
+    const plc = document.getElementById('available').value;
+    document.querySelector('#plcError').innerHTML = '';
+
+    if(!sequence) {
+        document.querySelector('#sequenceError').innerHTML = 'Please provide the sequence!';
+        return;
+    }
+
+    if(!plc) {
+        document.querySelector('#sequenceError').innerHTML = 'Please choose the PLC!';
+        return;
+    }
+
+    fetch(commBackend + '/sequence/' + sequence + '/' + plc + '/' + getCookie('username'))
+        .then(r => r.json())
+        .then(response => {
+            if(response.status === 'OK') {
+                document.querySelector('#sequenceError').classList.remove('error');
+                document.querySelector('#sequenceError').innerHTML = 'Executing sequence on ' + plc;
+            } else {
+                if(response.msg.length > 0) {
+                    document.querySelector('#sequenceError').classList.add('error');
+                    let errors = '';
+                    for(const error of response.msg) {
+                        errors += '- ' + error + '<br>';
+                    }
+                    document.querySelector('#sequenceError').innerHTML = 'Please correct the following errors in the sequence:<br>' + errors;
+                }
+            }
+            getPLCs();
+        });
+}
+
+const stopPLC = () => {
+    const plc = document.getElementById('unavailable').value;
+    document.querySelector('#sequenceError').innerHTML = '';
+
+    if(!plc) {
+        document.querySelector('#plcError').innerHTML = 'Please choose the PLC!';
+        return;
+    }
+
+    fetch(commBackend + '/stop/' + plc)
+        .then(r => r.json())
+        .then(response => {
+            if(response.status === 'OK') {
+                document.querySelector('#plcError').classList.remove('error');
+                document.querySelector('#plcError').innerHTML = 'PLC stop signal sent to ' + plc;
+            } else {
+                document.querySelector('#plcError').classList.add('error');
+                document.querySelector('#plcError').innerHTML = 'An error occurred while trying to stop ' + plc;
+            }
+            getPLCs();
+        });
+}
+
 const updateProfile = () => {
     const userID = getCookie('uid');
 
@@ -172,7 +270,7 @@ const isAuthenticated = () => {
 }
 
 const setup = (route) => {
-    const authenticatedRoutes = ['generator', 'validator', 'instructions', 'create-project', 'manage-projects', 'manage-project-components', 'profile'];
+    const authenticatedRoutes = ['generator', 'validator', 'instructions', 'create-project', 'manage-projects', 'manage-project-components', 'profile', 'execute-sequence'];
 
     if (authenticatedRoutes.indexOf(route) !== -1 && !isAuthenticated()) {
         window.location = 'index.html';
@@ -204,7 +302,7 @@ const setup = (route) => {
                             let element = '<div class="project-row">';
                             element += '<div class="cell">' + project.project_name + '</div>';
                             element += '<div class="cell">' + project.project_sequence + '</div>';
-                            element += '<div class="cell"><a href="manage-project-components.html?pid=' + project._id + '">Manage</a></div>';
+                            element += '<div class="cell"><a class="bgdrop" href="manage-project-components.html?pid=' + project._id + '">Manage</a> <a class="bgdrop" href="generator.html?pid=' + project._id + '&sequence=' + project.project_sequence +'">Generate</a> <a class="bgdrop" href="execute-sequence.html?sequence=' + project.project_sequence +'">Simulate</a></div>';
                             element += '</div>';
                             container.innerHTML += element;
                         }
@@ -238,6 +336,25 @@ const setup = (route) => {
             }
         } else if (route === 'profile') {
             getProfileData();
+        } else if (route === 'generator') {
+            if(projectDetails.id && projectDetails.sequence) {
+                document.getElementById('sequence').style.display = 'none';
+            }
+        } else if (route === 'execute-sequence') {
+            let params = window.location.search.substr(1);
+            if (params.length > 1) {
+                params = params.split('&');
+                for (const element of params) {
+                    const param = element.split('=');
+                    if (param[0] === 'sequence') {
+                        document.getElementById('sequence').value = param[1];
+                    }
+                }
+            }
+            getPLCs();
+            setInterval(() => {
+                getPLCs();
+            }, 10000);
         }
     }
 }
@@ -252,6 +369,7 @@ const displayNav = () => {
         document.querySelector('#generatorLink').classList.remove('hidden');
         document.querySelector('#validatorLink').classList.remove('hidden');
         document.querySelector('#instructionsLink').classList.remove('hidden');
+        document.querySelector('#executeLink').classList.remove('hidden');
     } else {
         document.querySelector('#signinLink').classList.remove('hidden');
         document.querySelector('#regLink').classList.remove('hidden');
@@ -261,6 +379,7 @@ const displayNav = () => {
         document.querySelector('#generatorLink').classList.add('hidden');
         document.querySelector('#validatorLink').classList.add('hidden');
         document.querySelector('#instructionsLink').classList.add('hidden');
+        document.querySelector('#executeLink').classList.add('hidden');
     }
 }
 
@@ -299,34 +418,55 @@ const getCookie = (name) => {
  */
 
 const generate = () => {
-    const checkbox = (document.getElementById('withSensors').checked ? '1' : '0');
     const errors = document.getElementById('withFaults').value;
 
-    if (document.getElementById('sequence').value === '') {
+    if(!projectDetails.id || !projectDetails.sequence) {
+        projectDetails.sequence = document.getElementById('sequence').value;
+    }
+
+
+    if (document.getElementById('sequence').value === '' && (!projectDetails.id || !projectDetails.sequence)) {
         document.getElementById('sequenceError').innerHTML = 'You need to provide sequence to generate!';
         return;
     }
 
     document.getElementById('correct_code').innerHTML = 'Generating...';
     document.getElementById('incorrect_code').innerHTML = 'Generating...';
+    document.getElementById('xmlTags').innerText = 'Generating...';
 
-    fetch(backend + '/sequence/generate/' + document.getElementById('sequence').value + '/' + checkbox + '/' + errors)
+    fetch(backend + '/sequence/generate2/' + projectDetails.sequence + '/' + errors + '/' + projectDetails.id)
         .then(o => o.json())
         .then(response => {
             let correct, incorrect;
+            console.log(response);
             if (screen.width < 768) {
-                correct = response.correct.toString().replaceAll('    ', ' ');
-                incorrect = response.incorrect.toString().replaceAll('    ', ' ');
+                correct = response.msg.code.toString().replaceAll('    ', ' ');
+                if (errors !== '0,none') {
+                    incorrect = response.msg.incorrect.toString().replaceAll('    ', ' ');
+                }
             } else {
-                correct = response.correct.toString();
-                incorrect = response.incorrect.toString();
+                correct = response.msg.code.toString();
+                if (errors !== '0,none') {
+                    incorrect = response.msg.incorrect.toString();
+                }
             }
             document.getElementById('solutionButton').innerText = 'Show solution';
             document.getElementById('correct_code').innerHTML = 'SOLUTION:\n\n' + correct;
 
-            if (typeof response.incorrect === 'undefined') {
+            if (response.msg.tags) {
+                document.getElementById('xmlTags').style.display = 'inline-block';
+                document.getElementById('xmlTagsBtn').style.display = 'inline-block';
+                document.getElementById('xmlTags').innerText = response.msg.tags.toString();
+            } else {
+                document.getElementById('xmlTags').style.display = 'none';
+                document.getElementById('xmlTagsBtn').style.display = 'none';
+            }
+
+            if (errors === '0,none') {
                 document.getElementById('correct_code').style.display = 'inline-block';
+                document.getElementById('correctCodeBtn').style.display = 'inline-block';
                 document.getElementById('incorrect_code').style.display = 'none';
+                document.getElementById('incorrectCodeBtn').style.display = 'none';
                 return false;
             }
 
@@ -334,11 +474,9 @@ const generate = () => {
                 document.getElementById('solutionButton').style.display = 'inline-block';
                 document.getElementById('incorrect_code').innerHTML = 'CODE WITH ERRORS:\n\n' + incorrect;
                 document.getElementById('correct_code').style.display = 'none';
+                document.getElementById('correctCodeBtn').style.display = 'none';
                 document.getElementById('incorrect_code').style.display = 'inline-block';
-
-            } else {
-                document.getElementById('correct_code').style.display = 'inline-block';
-                document.getElementById('incorrect_code').style.display = 'none';
+                document.getElementById('incorrectCodeBtn').style.display = 'inline-block';
             }
 
         });
@@ -347,9 +485,11 @@ const generate = () => {
 const showSolution = () => {
     if (document.getElementById('correct_code').style.display === 'block') {
         document.getElementById('correct_code').style.display = 'none';
+        document.getElementById('correctCodeBtn').style.display = 'none';
         document.getElementById('solutionButton').innerText = 'Show solution'
     } else {
         document.getElementById('correct_code').style.display = 'block';
+        document.getElementById('correctCodeBtn').style.display = 'block';
         document.getElementById('solutionButton').innerText = 'Hide solution'
     }
 }
@@ -421,30 +561,30 @@ const fetchProject = (pid) => {
             if (response.status === 'OK') {
                 let content = '';
                 let contentAssigned = '';
-                container.innerHTML = '<h6>' + response.msg.project_data.project_sequence.replaceAll(',', ', ') +'</h6><br>' +
+                container.innerHTML = '<h6>' + response.msg.project_data.project_sequence.replaceAll(',', ', ') + '</h6><br>' +
                     '<a class="dropdown-item" href="#" data-toggle="modal" data-target="#sequenceModal" id="seqModal">How sequence got evaluated</a><hr>';
                 container.innerHTML += '<label for="existingComponents">Assigned components</label><select id="existingComponents" class="form-control"></select>' +
-                    '<button class="btn btn-lg btn-primary half-width" onClick="viewConfig(\'' + pid +'\')" data-toggle="modal" data-target="#componentModal">View configuration</button>' +
-                    '<button class="btn btn-lg btn-primary half-width" onClick="deleteConfig(\'' + pid +'\')">Delete configuration</button><hr>' +
+                    '<button class="btn btn-lg btn-primary half-width" onClick="viewConfig(\'' + pid + '\')" data-toggle="modal" data-target="#componentModal">View configuration</button>' +
+                    '<button class="btn btn-lg btn-primary half-width" onClick="deleteConfig(\'' + pid + '\')">Delete configuration</button><hr>' +
                     '<label for="components">Unassigned components</label><select id="components" class="form-control"></select>';
 
                 const modalBody = document.querySelector('#sequenceModalBody');
                 projectSettings = response.msg.components.elements;
-                for(let i = 0; i < response.msg.components.elements.length; i++) {
+                for (let i = 0; i < response.msg.components.elements.length; i++) {
                     const element = response.msg.components.elements[i];
 
                     let sequenceElement = '<div class="elementIdentifier">"' + element.name + '"</div><div class="elementDescription">Assigned with the following types and identifiers: <i>'
                     const keys = ['actuator', 'timer', 'counter', 'pressure'];
 
-                    for(const key of keys) {
-                        if(element[key]) {
-                            sequenceElement += key + ' (' + element[key] +'), ';
+                    for (const key of keys) {
+                        if (element[key]) {
+                            sequenceElement += key + ' (' + element[key] + '), ';
                         }
                     }
 
                     sequenceElement = sequenceElement.substr(0, sequenceElement.length - 2) + '</i>';
 
-                    modalBody.innerHTML += sequenceElement+'</div><br>';
+                    modalBody.innerHTML += sequenceElement + '</div><br>';
                 }
 
                 for (const element of response.msg.unassignedComponents) {
@@ -457,7 +597,7 @@ const fetchProject = (pid) => {
 
                 document.querySelector('#existingComponents').innerHTML = contentAssigned;
                 document.querySelector('#components').innerHTML = content;
-                container.innerHTML += '<button class="btn btn-lg btn-primary btn-block" onClick="addConfig(\'' + pid +'\')">Add component configuration</button>';
+                container.innerHTML += '<button class="btn btn-lg btn-primary btn-block" onClick="addConfig(\'' + pid + '\')">Add component configuration</button>';
                 container.innerHTML += '<div id="options"></div>';
                 container.innerHTML += '<div id="detailedOptions"></div>';
                 container.innerHTML += '<div id="tagSettings"></div>';
@@ -495,7 +635,7 @@ const deleteConfig = (pid) => {
         body: JSON.stringify({pid: pid, component: component})
     }).then(res => res.json())
         .then(res => {
-            if(res.status === 'OK') {
+            if (res.status === 'OK') {
                 location.reload();
             } else {
                 document.querySelector('#componentError').innerHTML = res.msg;
@@ -515,26 +655,25 @@ const viewConfig = (pid) => {
         body: JSON.stringify({pid: pid, component: component})
     }).then(res => res.json())
         .then(res => {
-            if(res.status === 'OK') {
+            if (res.status === 'OK') {
                 const modalBody = document.querySelector('#componentModalBody');
                 modalBody.classList.remove('error');
                 let response = '';
                 const data = res.msg[0];
                 const type = res.msg[0].label.split('_')[0];
-                if(type === 'Timer') {
+                if (type === 'Timer') {
                     response += '<b>Type:</b> Timer<br>';
-                    response += '<b>Reset tag:</b> ' + data.resetTag + '<br>';
+                    response += '<b>Power tag:</b> ' + data.powerTag + '<br>';
                     response += '<b>Timer completed tag:</b> ' + data.completedTag + '<br>';
-                } else if(type === 'Counter') {
+                    response += '<b>Elapsed time tag:</b> ' + data.elapsedTimeTag + '<br>';
+                } else if (type === 'Counter') {
                     response += '<b>Type:</b> Counter<br>';
-                    response += '<b>Reset tag:</b> ' + data.resetTag + '<br>';
-                    response += '<b>Timer completed tag:</b> ' + data.completedTag + '<br>';
-                    response += '<b>Current counter value tag:</b> ' + data.currentValueTag + '<br>';
+                    response += '<b>Counter variable:</b> ' + data.counterVar + '<br>';
                 } else {
-                    if(data.type === 'singleActingSingleTag') {
+                    if (data.type === 'singleActingSingleTag') {
                         response += '<b>Type:</b> Single acting cylinder controlled with one tag <br>';
                         response += '<b>Extension tag:</b> ' + data.extTag + '<br>';
-                    } else if(data.type === 'singleActingDoubleTag') {
+                    } else if (data.type === 'singleActingDoubleTag') {
                         response += '<b>Type:</b> Single acting cylinder controlled with two tags';
                         response += '<b>Extension tag:</b> ' + data.extTag + '<br>';
                         response += '<b>Retraction tag:</b> ' + data.retTag + '<br>';
@@ -613,8 +752,8 @@ const displayCylinderOptions = (label, pid) => {
                     }
                     currentSelectionType = 'singleActingDoubleTag';
                     btnContainer.innerHTML = sensors;
-                    btnContainer.innerHTML += '<button class="btn btn-lg btn-primary btn-block" onClick="submitCylinderConfig(\'' + currentSelectionType +'\', \'' + label +'\', \'' + pid +'\')">Submit configuration</button>'
-                } else if(e.target.value === 'yes') {
+                    btnContainer.innerHTML += '<button class="btn btn-lg btn-primary btn-block" onClick="submitCylinderConfig(\'' + currentSelectionType + '\', \'' + label + '\', \'' + pid + '\')">Submit configuration</button>'
+                } else if (e.target.value === 'yes') {
                     if (document.querySelector('#retTag')) {
                         document.querySelector('#retTag').remove();
                     }
@@ -624,7 +763,7 @@ const displayCylinderOptions = (label, pid) => {
                     currentSelectionType = 'singleActingSingleTag';
 
                     btnContainer.innerHTML = sensors;
-                    btnContainer.innerHTML += '<button class="btn btn-lg btn-primary btn-block" onClick="submitCylinderConfig(\'' + currentSelectionType +'\', \'' + label +'\', \'' + pid +'\')">Submit configuration</button>'
+                    btnContainer.innerHTML += '<button class="btn btn-lg btn-primary btn-block" onClick="submitCylinderConfig(\'' + currentSelectionType + '\', \'' + label + '\', \'' + pid + '\')">Submit configuration</button>'
                 }
             })
         } else {
@@ -640,7 +779,7 @@ const displayCylinderOptions = (label, pid) => {
             currentSelectionType = 'doubleActing';
 
             btnContainer.innerHTML = sensors;
-            btnContainer.innerHTML += '<button class="btn btn-lg btn-primary btn-block" onClick="submitCylinderConfig(\'' + currentSelectionType +'\', \'' + label +'\', \'' + pid +'\')">Submit configuration</button>'
+            btnContainer.innerHTML += '<button class="btn btn-lg btn-primary btn-block" onClick="submitCylinderConfig(\'' + currentSelectionType + '\', \'' + label + '\', \'' + pid + '\')">Submit configuration</button>'
         }
     });
 }
@@ -650,38 +789,33 @@ const displayTimerOptions = (label, pid) => {
     const btnContainer = document.querySelector('#btnContainer');
     options.innerHTML = '';
     const resetTag = '<div id="resetTagContainer">' +
-        '<label for="resetTag">Reset tag</label>' +
-        '<input type="text" id="resetTag" class="form-control" placeholder="Tag name" required autofocus>' +
+        '<label for="resetTag">Power tag</label>' +
+        '<input type="text" id="powerTag" class="form-control" placeholder="Tag name" required autofocus>' +
         '</div>';
     const completedTag = '<div id="resetTagContainer">' +
         '<label for="completedTag">Timer completed tag</label>' +
         '<input type="text" id="completedTag" class="form-control" placeholder="Tag name" required>' +
         '</div>';
+    const elapsedTimeTag = '<div id="resetTagContainer">' +
+        '<label for="completedTag">Elapsed time tag</label>' +
+        '<input type="text" id="elapsedTimeTag" class="form-control" placeholder="Tag name" required>' +
+        '</div>';
     options.innerHTML += resetTag;
     options.innerHTML += completedTag;
-    btnContainer.innerHTML = '<button class="btn btn-lg btn-primary btn-block" onClick="submitTimerConfig(\'' + label +'\', \'' + pid +'\')">Submit configuration</button>'
+    options.innerHTML += elapsedTimeTag;
+    btnContainer.innerHTML = '<button class="btn btn-lg btn-primary btn-block" onClick="submitTimerConfig(\'' + label + '\', \'' + pid + '\')">Submit configuration</button>'
 }
 
 const displayCounterOptions = (label, pid) => {
     const options = document.querySelector('#options');
     const btnContainer = document.querySelector('#btnContainer');
     options.innerHTML = '';
-    const resetTag = '<div id="resetTagContainer">' +
-        '<label for="resetTag">Reset tag</label>' +
-        '<input type="text" id="resetTag" class="form-control" placeholder="Tag name" required autofocus>' +
+    const counterVar = '<div id="resetTagContainer">' +
+        '<label for="resetTag">Counter variable</label>' +
+        '<input type="text" id="counterVar" class="form-control" placeholder="Tag name" required autofocus>' +
         '</div>';
-    const completedTag = '<div id="resetTagContainer">' +
-        '<label for="completedTag">Counter completed tag</label>' +
-        '<input type="text" id="completedTag" class="form-control" placeholder="Tag name" required>' +
-        '</div>';
-    const currentValueTag = '<div id="resetTagContainer">' +
-        '<label for="currentValueTag">Current counter value tag</label>' +
-        '<input type="text" id="currentValueTag" class="form-control" placeholder="Tag name" required>' +
-        '</div>';
-    options.innerHTML += resetTag;
-    options.innerHTML += completedTag;
-    options.innerHTML += currentValueTag;
-    btnContainer.innerHTML = '<button class="btn btn-lg btn-primary btn-block" onClick="submitCounterConfig(\'' + label +'\', \'' + pid +'\')">Submit configuration</button>'
+    options.innerHTML += counterVar;
+    btnContainer.innerHTML = '<button class="btn btn-lg btn-primary btn-block" onClick="submitCounterConfig(\'' + label + '\', \'' + pid + '\')">Submit configuration</button>'
 }
 
 const submitCylinderConfig = (type, label, pid) => {
@@ -691,16 +825,16 @@ const submitCylinderConfig = (type, label, pid) => {
     cylinderConfiguration.label = label;
 
     cylinderConfiguration.extensionTag = document.querySelector('#tag1').value;
-    if(type !== 'singleActingSingleTag') {
+    if (type !== 'singleActingSingleTag') {
         cylinderConfiguration.retractionTag = document.querySelector('#tag2').value;
     }
     cylinderConfiguration.extSensorTag = document.querySelector('#sensorTag2').value;
     cylinderConfiguration.retSensorTag = document.querySelector('#sensorTag1').value;
 
 
-    const conditionSingle = cylinderConfiguration.pid && cylinderConfiguration.type === 'singleActingSingleTag'  && cylinderConfiguration.label && cylinderConfiguration.extensionTag && cylinderConfiguration.extSensorTag && cylinderConfiguration.retSensorTag;
+    const conditionSingle = cylinderConfiguration.pid && cylinderConfiguration.type === 'singleActingSingleTag' && cylinderConfiguration.label && cylinderConfiguration.extensionTag && cylinderConfiguration.extSensorTag && cylinderConfiguration.retSensorTag;
     const conditionDouble = (cylinderConfiguration.type === 'singleActingDoubleTag' || cylinderConfiguration.type === 'doubleActing') && (cylinderConfiguration.pid && cylinderConfiguration.label && cylinderConfiguration.extensionTag && cylinderConfiguration.retractionTag && cylinderConfiguration.extSensorTag && cylinderConfiguration.retSensorTag);
-    if(conditionSingle || conditionDouble) {
+    if (conditionSingle || conditionDouble) {
         fetch(backend + '/project/config/add', {
             method: 'post',
             headers: {
@@ -710,7 +844,7 @@ const submitCylinderConfig = (type, label, pid) => {
             body: JSON.stringify(cylinderConfiguration)
         }).then(res => res.json())
             .then(res => {
-                if(res.status === 'OK') {
+                if (res.status === 'OK') {
                     location.reload();
                 } else {
                     document.querySelector('#componentError').innerHTML = res.msg;
@@ -726,10 +860,11 @@ const submitTimerConfig = (label, pid) => {
     timerConfiguration.pid = pid;
     timerConfiguration.type = 'timer';
     timerConfiguration.label = label;
-    timerConfiguration.resetTag = document.querySelector('#resetTag').value;
+    timerConfiguration.powerTag = document.querySelector('#powerTag').value;
     timerConfiguration.completedTag = document.querySelector('#completedTag').value;
+    timerConfiguration.elapsedTimeTag = document.querySelector('#elapsedTimeTag').value;
 
-    if(timerConfiguration.pid && timerConfiguration.label && timerConfiguration.resetTag && timerConfiguration.completedTag) {
+    if (timerConfiguration.pid && timerConfiguration.label && timerConfiguration.powerTag && timerConfiguration.completedTag && timerConfiguration.elapsedTimeTag) {
         fetch(backend + '/project/config/add', {
             method: 'post',
             headers: {
@@ -739,7 +874,7 @@ const submitTimerConfig = (label, pid) => {
             body: JSON.stringify(timerConfiguration)
         }).then(res => res.json())
             .then(res => {
-                if(res.status === 'OK') {
+                if (res.status === 'OK') {
                     location.reload();
                 } else {
                     document.querySelector('#componentError').innerHTML = res.msg;
@@ -753,11 +888,9 @@ const submitCounterConfig = (label, pid) => {
     counterConfiguration.pid = pid;
     counterConfiguration.type = 'counter';
     counterConfiguration.label = label;
-    counterConfiguration.resetTag = document.querySelector('#resetTag').value;
-    counterConfiguration.completedTag = document.querySelector('#completedTag').value;
-    counterConfiguration.currentValueTag = document.querySelector('#currentValueTag').value;
+    counterConfiguration.counterVar = document.querySelector('#counterVar').value;
 
-    if(counterConfiguration.pid && counterConfiguration.label && counterConfiguration.resetTag && counterConfiguration.completedTag && counterConfiguration.currentValueTag) {
+    if (counterConfiguration.pid && counterConfiguration.label && counterConfiguration.counterVar) {
         fetch(backend + '/project/config/add', {
             method: 'post',
             headers: {
@@ -767,11 +900,20 @@ const submitCounterConfig = (label, pid) => {
             body: JSON.stringify(counterConfiguration)
         }).then(res => res.json())
             .then(res => {
-                if(res.status === 'OK') {
+                if (res.status === 'OK') {
                     location.reload();
                 } else {
                     document.querySelector('#componentError').innerHTML = res.msg;
                 }
             });
     }
+}
+
+function copyText(id) {
+    let range = document.createRange();
+    range.selectNode(document.getElementById(id));
+    window.getSelection().removeAllRanges(); // clear current selection
+    window.getSelection().addRange(range); // to select text
+    document.execCommand("copy");
+    window.getSelection().removeAllRanges();// to deselect
 }

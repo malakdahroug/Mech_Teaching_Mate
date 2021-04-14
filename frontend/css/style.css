@@ -23,25 +23,31 @@ footer {
     display: none!important;
 }
 
-#codeblocks {
-    display: flex;
-    flex-direction: row;
-    flex-wrap: nowrap;
-    justify-content: space-between;
-}
-
 #correct_code {
     padding: 1rem;
-    min-width: calc(50% - 2rem);
+    min-width: 100%;
     display: none;
     background: #FAFAFA!important;
 }
 
 #incorrect_code {
     padding: 1rem;
-    min-width: calc(50% - 2rem);
+    min-width: 100%;
     display: none;
     background: #FAFAFA!important;
+}
+
+#xmlTags {
+    padding: 1rem;
+    min-width: 100%;
+    display: none;
+    background: #FAFAFA!important;
+    height: auto;
+    font-size: 0.75rem;
+}
+
+#xmlTagsBtn, #correctCodeBtn, #incorrectCodeBtn {
+    display: none;
 }
 
 #solutionButton {
@@ -76,6 +82,7 @@ footer {
     justify-content: space-between;
     border: 1px solid grey;
     margin: 0.125rem;
+    line-height: 2.5rem;
 }
 
 .project-row:nth-child(odd) {
@@ -132,11 +139,20 @@ footer {
     width: 50%!important;
 }
 
+.bgdrop {
+    border-radius: 5px;
+    padding: 0.25rem;
+    margin: 0.25rem;
+    background: rgba(255, 255, 255, 0.75);
+    text-decoration: none;
+}
+
+.bgdrop:hover {
+    background: rgba(0, 0, 0, 0.05);
+    text-decoration: none;
+}
+
 @media (max-width: 767px) {
-    #codeblocks {
-        flex-direction: column;
-        flex-wrap: nowrap;
-    }
 
     #correct_code {
         width: 100%;

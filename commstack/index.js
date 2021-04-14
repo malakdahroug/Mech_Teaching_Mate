@@ -11,6 +11,8 @@ import {
 import express from 'express';
 const app = express();
 
+import axios from 'axios';
+
 // OPC UA Establishing connection settings
 const connectionStrategy = {
     initialDelay: 1000,
@@ -37,11 +39,11 @@ console.log('Started');
 // - state(boolean) - current state of the PLC availability, if true then PLC can be connected to
 // - stopSignal(boolean) - was stopSignal issued? if set to true, PLC will be attempted to be stopped at next possible opportunity in the code execution
 let plcList = [
-    {name: 'PLC_5', ip: '192.168.0.42', state: true, stopSignal: false}
+    {name: 'PLC_5', ip: '192.168.0.42', state: true, stopSignal: false, currentUser: ''}
 ];
 
 // Main function containing all logics of the simulated PLC
-async function main(sequence, ip) {
+async function main(sequence, ip, user) {
     try {
         // Find PLC with the given IP address in the list
         const plc = plcList.find((e) => {
@@ -52,6 +54,8 @@ async function main(sequence, ip) {
         const plcIndex = plcList.indexOf(plc);
         // Set PLC state to false (will prevent others from trying to connect to this PLC while it's running)
         plc.state = false;
+        // Set current PLC user
+        plc.currentUser = user;
 
         // Update the PLC in the list
         plcList[plcIndex] = plc;
@@ -60,7 +64,7 @@ async function main(sequence, ip) {
         const endpointUrl = 'opc.tcp://' + ip + ':4840';
 
         // Connect to PLC
-        console.warn('Connecting to',ip);
+        console.warn('Connecting to', ip);
         await client.connect(endpointUrl);
         console.log("Connected to PLC", ip);
 
@@ -70,7 +74,7 @@ async function main(sequence, ip) {
         console.log("PLC session created");
 
         // Generate mock T value that can be used in e.g. T+1S or TS, value generated will be between 1 and 3 seconds
-        const tTime = Math.ceil(Math.random()*3);
+        const tTime = Math.ceil(Math.random() * 3);
         // Prepare the Node-OPCUA command to be written with the generated value
         const tVar = [{
             nodeId: 'ns=3;s=\"T_VARIABLE\"',
@@ -85,7 +89,7 @@ async function main(sequence, ip) {
         }];
 
         // Generate mock N value that can be used in e.g. [A+,A-]^N+2, value generated will be between 1 and 3
-        const nRepetitions = Math.ceil(Math.random()*3);
+        const nRepetitions = Math.ceil(Math.random() * 3);
         // Prepare the Node-OPCUA command to be written with the generated value
         const nVar = [{
             nodeId: 'ns=3;s=\"N_VARIABLE\"',
@@ -101,12 +105,12 @@ async function main(sequence, ip) {
 
         // Write N_VARIABLE to the PLC memory
         await session.write(nVar, (err, res) => {
-            console.log('Setting mock value of N_VARIABLE to',nRepetitions)
+            console.log('Setting mock value of N_VARIABLE to', nRepetitions)
         });
 
         // Write T_VARIABLE to the PLC memory
         await session.write(tVar, (err, res) => {
-            console.log('Setting mock value of T_VARIABLE to',tTime)
+            console.log('Setting mock value of T_VARIABLE to', tTime)
         });
 
         // Prepare the empty Set for actuators (set was chosen to ensure only unique entries)
@@ -114,9 +118,9 @@ async function main(sequence, ip) {
 
         // Iterate through the whole sequence to add all actuators to the set (later on set will be used to start all
         // cylinders in their retracted positions);
-        for(let i = 0; i < sequence.length; i++) {
+        for (let i = 0; i < sequence.length; i++) {
             const actuator = sequence[i].replaceAll(/[T\[\]()+S\-0-9]/g, '');
-            if(actuator) {
+            if (actuator) {
                 actuators.add(actuator);
             }
         }
@@ -128,7 +132,7 @@ async function main(sequence, ip) {
         let actuatorActions = [];
 
         // Iterate through the list of actuators and add retraction action for each of them to actuatorActions
-        for(let i = 0; i < actuators.length; i++) {
+        for (let i = 0; i < actuators.length; i++) {
             actuatorActions = actuatorActions.concat(retract(actuators[i]));
         }
 
@@ -160,19 +164,19 @@ async function main(sequence, ip) {
         let nested = false;
 
         // Checks if the first sequence element contains square bracket and if the last element contains closing square bracket
-        if(tempSequence[0].search(/\[/) !== -1 && tempSequence[tempSequence.length - 1].search(/]/) !== -1) {
+        if (tempSequence[0].search(/\[/) !== -1 && tempSequence[tempSequence.length - 1].search(/]/) !== -1) {
             // Remove square bracket from the start and end
             tempSequence[0] = tempSequence[0].replace('[', '');
             tempSequence[tempSequence.length - 1] = tempSequence[tempSequence.length - 1].replace(']', '');
 
             // Checks if there are any other square brackets in the sequence, if so it is a repeating sequence
-            for(let i = 0; i < tempSequence.length; i++) {
-                if(tempSequence[i].search(/\[/) !== -1) {
+            for (let i = 0; i < tempSequence.length; i++) {
+                if (tempSequence[i].search(/\[/) !== -1) {
                     nested = true;
                     break;
                 }
 
-                if(tempSequence[i].search(/]/) !== -1) {
+                if (tempSequence[i].search(/]/) !== -1) {
                     nested = false;
                     break;
                 }
@@ -180,7 +184,7 @@ async function main(sequence, ip) {
         }
 
         // If sequence is nested - starting and ending square brackets are removed
-        if(nested) {
+        if (nested) {
             sequence[0] = sequence[0].replace('[', '');
             sequence[sequence.length - 1] = sequence[sequence.length - 1].substr(0, sequence[sequence.length - 1].length - 1);
         }
@@ -190,14 +194,14 @@ async function main(sequence, ip) {
 
         // Main logics
         // It will iterate through each element of the sequence and perform the corresponding action
-        for(let i = 0; i < sequence.length; i++) {
+        for (let i = 0; i < sequence.length; i++) {
             // Finds PLC in the list
             const plcStatus = plcList.find((e) => {
                 return e.ip === ip;
             });
 
             // If stopSignal for this PLC was detected it is going to start a stop procedure
-            if(plcStatus.stopSignal) {
+            if (plcStatus.stopSignal) {
                 // Close the OPC session
                 await session.close();
                 // Disconnect from the PLC
@@ -208,6 +212,8 @@ async function main(sequence, ip) {
                 plc.state = true;
                 // Set stopSignal to false as PLC is stopping
                 plc.stopSignal = false;
+                // Reset current PLC user
+                plc.currentUser = '';
 
                 // Update the PLC in the list with updated values
                 plcList[plcIndex] = plc;
@@ -216,7 +222,7 @@ async function main(sequence, ip) {
 
             // Search for opening square bracket, if it was found set a repeating part start point at the current list index
             // It will be going back to this point until all repetitions are fulfilled
-            if(sequence[i].search(/\[/) !== -1) {
+            if (sequence[i].search(/\[/) !== -1) {
                 // Remove the bracket from the current sequence action
                 sequence[i] = sequence[i].replace(/\[/, '');
 
@@ -225,17 +231,17 @@ async function main(sequence, ip) {
             }
 
             // Search for closing square bracket, if it was found set a repeating part end point at the current list index
-            if(sequence[i].search(/]/) !== -1) {
+            if (sequence[i].search(/]/) !== -1) {
                 // Set ending point to the current index
                 repeatTarget = i;
 
                 // Search for repeating sequence with counter
-                if(sequence[i].search(/]\^/) !== -1) {
+                if (sequence[i].search(/]\^/) !== -1) {
                     // Set repetitions to the default value (-1)
                     repetitions = -1;
 
                     // Check if there is N variable in the current sequence action
-                    if(sequence[i].substr(sequence[i].search(/\^/) + 1, sequence[i].length).startsWith('N')) {
+                    if (sequence[i].substr(sequence[i].search(/\^/) + 1, sequence[i].length).startsWith('N')) {
                         // Remove N+ from the current action
                         sequence[i] = sequence[i].replace('N+', '');
                         const nValue = (await session.readVariableValue("ns=3;s=\"N_VARIABLE\"")).value.value;
@@ -264,9 +270,9 @@ async function main(sequence, ip) {
                 let time = 0;
 
                 // Check if the current action uses T variable
-                if(sequence[i].search('T') !== -1) {
+                if (sequence[i].search('T') !== -1) {
                     // Check if T variable is modified incremented by +number
-                    if(sequence[i].search(/\+/) !== -1) {
+                    if (sequence[i].search(/\+/) !== -1) {
                         // Read current value of T and add number
                         const tValue = (await session.readVariableValue("ns=3;s=\"T_VARIABLE\"")).value.value;
                         // Set time to a number read from the current action + current value of T variable, multiply by 1000 to form milliseconds
@@ -286,19 +292,19 @@ async function main(sequence, ip) {
 
                 // If sequence is forever looping, start is defined, target is defined and the current index matches
                 // target index of repeating sequence - set i to the start - 1 (-1 as i is being incremented after each iteration of the loop)
-                if(repetitions === -1 && repeatStart !== -1 && repeatTarget !== -1 && i === repeatTarget) {
+                if (repetitions === -1 && repeatStart !== -1 && repeatTarget !== -1 && i === repeatTarget) {
                     i = repeatStart - 1;
                 }
 
                 // If repeat target is defined and i equals to repeating sequence target index, set i to start - 1  and increment repeatCount
-                if(repeatTarget !== -1 && i === repeatTarget) {
+                if (repeatTarget !== -1 && i === repeatTarget) {
                     repeatCount++;
                     i = repeatStart - 1;
                 }
 
                 // If repetitions are defined and repeatCount equals to repetition count it means all repetitions are fulfilled
                 // reset all repeating sequence values
-                if(repetitions !== -1 && repeatCount === repetitions) {
+                if (repetitions !== -1 && repeatCount === repetitions) {
                     repeatStart = -1;
                     repeatCount = -1;
                     repetitions = -1;
@@ -310,7 +316,7 @@ async function main(sequence, ip) {
                 // - set i to -1 to go back to the beginning of the sequence
                 // - set sequence to tempSequence so the original values are retrieved (before any modification, with initial square brackets removed)
                 // - set all repeating sequence values to their initial values
-                if(nested && i === sequence.length - 1) {
+                if (nested && i === sequence.length - 1) {
                     sequence = tempSequence;
                     i = -1;
                     repeatStart = -1;
@@ -327,7 +333,7 @@ async function main(sequence, ip) {
             let current = sequence[i];
 
             // Search for opening round bracket, if it is present in the current element it means it is concurrent sequence)
-            if(current.search(/\(/) !== -1) {
+            if (current.search(/\(/) !== -1) {
                 // Remove round bracket
                 current = current.replace(/\(/, '');
                 // Set concurrentStart to true to indicated the next actions should occur at the same time until the closing round bracket is found)
@@ -335,7 +341,7 @@ async function main(sequence, ip) {
             }
 
             // Search for closing round bracket, if it is present in the current element it means it is the end of concurrent sequence)
-            if(current.search(/\)/) !== -1) {
+            if (current.search(/\)/) !== -1) {
                 // Remove round bracket
                 current = current.replace(/\)/, '');
                 // Set concurrentEnd to false to indicate actuations can occur now
@@ -345,9 +351,9 @@ async function main(sequence, ip) {
             // Check if actuations from the previous section completed succesfully
             let previousCompleted = await checkActuators(session, previousActuators);
             // Wait until the actuations from the previous iteration have fully completed
-            while(!previousCompleted) {
+            while (!previousCompleted) {
                 // If stopSignal for this PLC was detected it is going to start a stop procedure
-                if(plcStatus.stopSignal) {
+                if (plcStatus.stopSignal) {
                     // Close the OPC session
                     await session.close();
                     // Disconnect from the PLC
@@ -358,6 +364,8 @@ async function main(sequence, ip) {
                     plc.state = true;
                     // Set stopSignal to false as PLC is stopping
                     plc.stopSignal = false;
+                    // Reset current PLC user
+                    plc.currentUser = '';
 
                     // Update the PLC in the list with updated values
                     plcList[plcIndex] = plc;
@@ -369,10 +377,10 @@ async function main(sequence, ip) {
 
             // If loop got to this point it means that it must be an actuation
             // Check if the second character is + or - and add the right actuation to the action list
-            if(current[1] === '-') {
+            if (current[1] === '-') {
                 // If the current actuation is retract, add retraction command to action list
                 action = action.concat(retract(current[0]));
-            } else if(current[1] === '+') {
+            } else if (current[1] === '+') {
                 // If the current actuation is extend, add extension command to action list
                 action = action.concat(extend(current[0]));
             }
@@ -382,34 +390,35 @@ async function main(sequence, ip) {
 
             // If start of the concurrent sequence was detected, but it has not reached the end of the concurrent part
             // continue (skip the rest of the iteration)
-            if(concurrentStart && !concurrentEnd) {
+            if (concurrentStart && !concurrentEnd) {
                 continue;
             }
 
             // If concurrent part end was detected, set start and end to false (then proceed to the actuation)
-            if(concurrentEnd) {
+            if (concurrentEnd) {
                 concurrentStart = false;
                 concurrentEnd = false;
             }
 
             // Perform the actuations
-            await session.write(action, (err, res) => {});
+            await session.write(action, (err, res) => {
+            });
 
             // If sequence is forever looping, start is defined, target is defined and the current index matches
             // target index of repeating sequence - set i to the start - 1 (-1 as i is being incremented after each iteration of the loop)
-            if(repetitions === -1 && repeatStart !== -1 && repeatTarget !== -1 && i === repeatTarget) {
+            if (repetitions === -1 && repeatStart !== -1 && repeatTarget !== -1 && i === repeatTarget) {
                 i = repeatStart - 1;
             }
 
             // If repeat target is defined and i equals to repeating sequence target index, set i to start - 1  and increment repeatCount
-            if(repeatTarget !== -1 && i === repeatTarget) {
+            if (repeatTarget !== -1 && i === repeatTarget) {
                 repeatCount++;
                 i = repeatStart - 1;
             }
 
             // If repetitions are defined and repeatCount equals to repetition count it means all repetitions are fulfilled
             // reset all repeating sequence values
-            if(repetitions !== -1 && repeatCount === repetitions) {
+            if (repetitions !== -1 && repeatCount === repetitions) {
                 repeatStart = -1;
                 repeatCount = -1;
                 repetitions = -1;
@@ -421,7 +430,7 @@ async function main(sequence, ip) {
             // - set i to -1 to go back to the beginning of the sequence
             // - set sequence to tempSequence so the original values are retrieved (before any modification, with initial square brackets removed)
             // - set all repeating sequence values to their initial values
-            if(nested && i === sequence.length - 1) {
+            if (nested && i === sequence.length - 1) {
                 sequence = tempSequence;
                 i = -1;
                 repeatStart = -1;
@@ -449,6 +458,8 @@ async function main(sequence, ip) {
 
         // Set PLC state to available(true)
         plc.state = true;
+        // Reset current PLC user
+        plc.currentUser = '';
         // Update state of the PLC in the list
         plcList[plcIndex] = plc;
 
@@ -458,57 +469,84 @@ async function main(sequence, ip) {
 }
 
 // GET Route that fulfills sequence execution
-app.get('/sequence/:sequence/:ip', async (req, res) => {
-    // Break the sequence down using commas (converts it to an array of actions), remove any white space and convert it to all capitals
-    let sequence = req.params.sequence.toUpperCase().replaceAll(/\s/g, "").split(',');
+app.get('/sequence/:sequence/:ip/:user', async (req, res) => {
+    // Temporary Cross Origin workaround
+    res.header("Access-Control-Allow-Origin", "*");
 
-    // Get IP of the PLC from the URL parameter
-    let ip = req.params.ip;
-
-    // Search for PLC with the given IP address in the list of PLCs
-    const plc = plcList.find((e) => {return e.ip === ip});
-    // If PLC was found and it is available
-    if(plc && plc.state) {
-        // Execute the sequence
-        main(sequence, ip).then(() => {
-            console.log('PLC execution finished');
-        });
-        // Send confirmation back to the client
-        res.send({status: 'OK', msg: 'PLC execution started!'});
-    // If PLC was found, but state is not true, send feedback saying PLC is currently bust
-    } else if(plc) {
-        res.send({status: 'Error', msg: 'Chosen PLC is currently busy!'});
-    // If PLC was not found, send feedback saying PLC was not found
+    // Validate sequence using backend API
+    const isValid = await axios.get('http://localhost:3000/sequence/isValid/' + req.params.sequence.toUpperCase());
+    // If sequence is invalid return an error, else proceed with execution
+    if(isValid.data.length !== 0) {
+        res.send({status: 'Error', msg: isValid.data});
     } else {
-        res.send({status: 'Error', msg: 'PLC not found!'});
+        // Break the sequence down using commas (converts it to an array of actions), remove any white space and convert it to all capitals
+        const sequence = req.params.sequence.toUpperCase().replaceAll(/\s/g, "").split(',');
+
+        // Get IP of the PLC from the URL parameter
+        const ip = req.params.ip;
+
+        // Get user from the URL parameter
+        const user = req.params.user;
+        // Search for PLC with the given IP address in the list of PLCs
+        const plc = plcList.find((e) => {
+            return e.ip === ip
+        });
+        // If PLC was found and it is available
+        if (plc && plc.state) {
+            // Execute the sequence
+            main(sequence, ip, user).then(() => {
+                console.log('PLC execution finished');
+            });
+            // Send confirmation back to the client
+            res.send({status: 'OK', msg: 'PLC execution started!'});
+            // If PLC was found, but state is not true, send feedback saying PLC is currently bust
+        } else if (plc) {
+            res.send({status: 'Error', msg: 'Chosen PLC is currently busy!'});
+            // If PLC was not found, send feedback saying PLC was not found
+        } else {
+            res.send({status: 'Error', msg: 'PLC not found!'});
+        }
     }
 });
 
 // GET Route that fulfills stopping PLC execution
 app.get('/stop/:ip', async (req, res) => {
+    // Temporary Cross Origin workaround
+    res.header("Access-Control-Allow-Origin", "*");
+
     // Get IP of the PLC from the URL parameter
     let ip = req.params.ip;
 
     // Search for PLC with the given IP address in the list of PLCs
-    const plc = plcList.find((e) => {return e.ip === ip});
+    const plc = plcList.find((e) => {
+        return e.ip === ip
+    });
 
     // Get index of the PLC in the list
     const plcIndex = plcList.indexOf(plc);
 
     // If PLC was found
-    if(plc) {
+    if (plc) {
         // Set stopSignal to true so it can be stopped at the first opportunity
         plc.stopSignal = true;
         // Update PLC in the list
-        plc[plcIndex] = plc;
+        plcList[plcIndex] = plc;
 
         // Send confirmation that PLC execution stop was triggered
         res.send({status: 'OK', msg: 'PLC stop signal sent!'});
-    // If PLC was not found, send feedback saying PLC was not found
+        // If PLC was not found, send feedback saying PLC was not found
     } else {
         res.send({status: 'Error', msg: 'PLC not found!'});
     }
 });
+
+// GET Route returns list of all available PLCs
+app.get('/plc/get', async (req, res) => {
+    // Temporary Cross Origin workaround
+    res.header("Access-Control-Allow-Origin", "*");
+    res.send({status: 'OK', msg: plcList});
+});
+
 
 // Define port application will be listening on (3005), it was separated from the backend to prevent full system crash if there's a PLC error e.g. connection error
 app.listen(3005);
@@ -519,19 +557,19 @@ async function checkActuators(session, actuators) {
     let state = {};
 
     // Iterate through the list of actuations
-    for(let i = 0; i < actuators.length; i++) {
+    for (let i = 0; i < actuators.length; i++) {
         // Poll each of the sensors to check their current state
         state.ext = (await session.readVariableValue("ns=3;s=\"Sensor_" + actuators[i][0] + "_Extended\"")).value.value;
         state.ret = (await session.readVariableValue("ns=3;s=\"Sensor_" + actuators[i][0] + "_Retracted\"")).value.value;
 
         // If the action was to retract and cylinder has not retracted return false indicating it is still retracting
-        if(actuators[i][1] === '-') {
-            if(!state.ret) {
+        if (actuators[i][1] === '-') {
+            if (!state.ret) {
                 return false;
             }
-        // If the action was to extend and cylinder has not extended return false indicating it is still extending
-        } else if(actuators[i][1] === '+') {
-            if(!state.ext) {
+            // If the action was to extend and cylinder has not extended return false indicating it is still extending
+        } else if (actuators[i][1] === '+') {
+            if (!state.ext) {
                 return false;
             }
         }
@@ -551,7 +589,7 @@ function sleep(ms) {
 // - Set retract to True
 function retract(cylinder) {
     return [{
-        nodeId: 'ns=3;s=\"Cylinder_' + cylinder +'_Extend\"',
+        nodeId: 'ns=3;s=\"Cylinder_' + cylinder + '_Extend\"',
         attributeId: AttributeIds.Value,
         indexRange: null,
         value: {
@@ -562,7 +600,7 @@ function retract(cylinder) {
         }
     },
         {
-            nodeId: 'ns=3;s=\"Cylinder_' + cylinder +'_Retract\"',
+            nodeId: 'ns=3;s=\"Cylinder_' + cylinder + '_Retract\"',
             attributeId: AttributeIds.Value,
             indexRange: null,
             value: {
@@ -580,7 +618,7 @@ function retract(cylinder) {
 // - Set extend to True
 function extend(cylinder) {
     return [{
-        nodeId: 'ns=3;s=\"Cylinder_' + cylinder +'_Retract\"',
+        nodeId: 'ns=3;s=\"Cylinder_' + cylinder + '_Retract\"',
         attributeId: AttributeIds.Value,
         indexRange: null,
         value: {
@@ -591,15 +629,15 @@ function extend(cylinder) {
         }
     },
         {
-        nodeId: 'ns=3;s=\"Cylinder_' + cylinder +'_Extend\"',
-        attributeId: AttributeIds.Value,
-        indexRange: null,
-        value: {
+            nodeId: 'ns=3;s=\"Cylinder_' + cylinder + '_Extend\"',
+            attributeId: AttributeIds.Value,
+            indexRange: null,
             value: {
-                dataType: "Boolean",
-                value: true
+                value: {
+                    dataType: "Boolean",
+                    value: true
+                }
             }
         }
-    }
     ]
 }
