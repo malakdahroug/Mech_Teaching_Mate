@@ -26,13 +26,16 @@ app.options("*", cors()); // include before other routes
 
 // DATABASE SCHEMAS START - Schemas for each of the collections used by the application
 const User = mongoose.model('User', {name: String, username: String, email: String, password: String});
+
 const Project = mongoose.model('Project', {
     user_id: String,
     project_name: String,
     project_sequence: String,
     validity: Boolean
 });
+
 const ProjectConfig = mongoose.model('ProjectConfig', {project_id: String, assigned_elements: Array});
+
 const ActuatorConfig = mongoose.model('ActuatorConfig', {
     project_id: String,
     label: String,
@@ -42,6 +45,7 @@ const ActuatorConfig = mongoose.model('ActuatorConfig', {
     extSnsTag: String,
     retSnsTag: String
 });
+
 const TimerConfig = mongoose.model('TimerConfig', {
     project_id: String,
     label: String,
@@ -49,49 +53,13 @@ const TimerConfig = mongoose.model('TimerConfig', {
     completedTag: String,
     elapsedTimeTag: String
 });
+
 const CounterConfig = mongoose.model('CounterConfig', {
     project_id: String,
     label: String,
     counterVar: String
 });
-
 // DATABASE SCHEMAS END
-
-// // Legacy route for generating the code based on the given sequence
-// app.get('/generateSequence/:sequence/:sensorsPresent', function(req, res){
-//     // Temporary Cross Origin workaround
-//     res.header("Access-Control-Allow-Origin", "*");
-//
-//     const sequenceQueue = new queue(); // Instantiates a new Queue for the client and stores it in a constant sequenceQueue
-//     const sensors = req.params.sensorsPresent === '1';
-//
-//     // Takes a sequence from a URL parameter, converts it to uppercase letter and splits it by commas
-//     // The result will form an array of each of the actuations
-//     let sequenceType = '';
-//
-//     // Each of the regular expression below is supposed to detect different type of sequence, if it is matching
-//     // a regular expression it will add 1 to the sequence type string, otherwise it will add 0
-//
-//     // Regular expression that detects if sequence has multiple actuations occurring at once
-//     sequenceType += ((req.params.sequence.toUpperCase().search(/\((([A-Z](\+|\-),)|([1-9]+[0-9]*S,))+([A-Z](\+|\-)|([1-9]+[0-9]*S))\)/) !== -1) ? 1 : 0);
-//
-//     // Regular expression that detects if sequence has repeated actions (e.g. through a counter)
-//     sequenceType += ((req.params.sequence.toUpperCase().search(/\[(([A-Z](\+|\-),)|([1-9]+[0-9]*S,))*([A-Z](\+|\-)\)|([1-9]+[0-9]*S))\]\^([2-9]|[1-9]+[0-9]+)/) !== -1) ? 1 : 0);
-//
-//     // Regular expression that detects if sequence includes a timer
-//     sequenceType += ((req.params.sequence.toUpperCase().search(/([1-9]+[0-9]*S)/) !== -1) ? 1 : 0);
-//
-//     console.log(sequenceType)
-//
-//     let sequence = req.params.sequence.toUpperCase().split(',');
-//
-//     // If concurrent, repetitive or timed sequence was detected it will return an error informing these types of sequences are not currently supported
-//     if(sequenceType !== '000') {
-//         res.send('Concurrent, repetitive and timed sequences are not currently supported!');
-//     } else {
-//         res.send(generateCode(sequence, sequenceQueue, sensors)); // Sends response to the client
-//     }
-// });
 
 // Route that handles the project creation
 app.get('/project/create/:id/:name/:sequence', async function (req, res) {
@@ -151,16 +119,28 @@ app.get('/project/create/:id/:name/:sequence', async function (req, res) {
 app.get('/project/get/:project_id', async function (req, res) {
     // Temporary Cross Origin workaround
     res.header("Access-Control-Allow-Origin", "*");
+
+    // Fetch the project with the given projectID (passed as parameter)
     const project = await Project.findOne({_id: req.params.project_id}).exec();
+
+    // Fetch the corresponding config
     const projectConfig = await ProjectConfig.findOne({project_id: req.params.project_id}).exec();
 
+    // Break down the sequence from the project configuration (using commas as a separator)
     const sequence = project.project_sequence.toUpperCase().split(',');
 
+    // Goes through the sequence and returns list of components for the given sequence
     const components = getComponents(sequence);
+
+    // Get list of unassigned components (components that do not have existing configuration)
     const unassignedComponents = getUnassignedComponents(components, projectConfig);
+
+    // Get list of assigned components (components that do have assigned configuration)
     const assignedComponents = getAssignedComponents(components, projectConfig);
 
+    // If project was found return success message
     if (project) {
+        // Prepare the message and send it
         res.send({
             status: 'OK',
             msg: {
@@ -172,6 +152,7 @@ app.get('/project/get/:project_id', async function (req, res) {
             }
         });
     } else {
+        // If the project was not found, send error back
         res.send({status: 'Error', msg: 'Project with the given ID does not exist!'});
     }
 });
@@ -508,7 +489,8 @@ app.get('/sequence/generate2/:sequence/:errors/:projectID?', async function (req
             const code = await generateCode2(sequence, projectConfigID._id.toString(), req.params.errors);
             res.send({status: 'OK', msg: code});
         } else {
-            res.send({status: 'OK', msg: {code: 'Please make sure project is fully configured!'}});
+            const code = await generateCode2(sequence, null, req.params.errors);
+            res.send({status: 'OK', msg: code});
         }
     } else {
         res.send({status: 'Error', msg: sequenceValidator});
@@ -1268,7 +1250,7 @@ async function generateCode2(sequence, projectID, errors) {
         for (const element of projectConfiguration.assigned_elements) {
             if (cylinderTypes.indexOf(element.component_type) !== -1) {
                 const elementConfig = await ActuatorConfig.findOne({_id: element.component_id});
-                sequenceElements.push({type: 'actuator', label: element.component_name, config: elementConfig});
+                sequenceElements.push({type: element.component_type, label: element.component_name, config: elementConfig});
             } else if (element.component_type === 'timer') {
                 const elementConfig = await TimerConfig.findOne({_id: element.component_id});
                 sequenceElements.push({type: 'timer', label: element.component_name, config: elementConfig});
@@ -1377,7 +1359,10 @@ async function generateCode2(sequence, projectID, errors) {
                         actuatorTag.extSns = actuatorConfig.config.extSnsTag;
                         actuatorTag.retSns = actuatorConfig.config.retSnsTag;
                         actuatorTag.ext = actuatorConfig.config.extTag;
-                        actuatorTag.ret = actuatorConfig.config.retTag;
+
+                        if(actuatorTag.type !== 'singleActingSingleTag') {
+                            actuatorTag.ret = actuatorConfig.config.retTag;
+                        }
                     } else {
                         actuatorTag.extSns = 'Sensor_' + cur[0] + '_Extended';
                         actuatorTag.retSns = 'Sensor_' + cur[0] + '_Retracted';
@@ -1447,15 +1432,16 @@ async function generateCode2(sequence, projectID, errors) {
                         const actuatorConfig = sequenceElements.find((e) => {
                             return e.label === actuator;
                         });
+
                         actuatorTag.extSns = actuatorConfig.config.extSnsTag;
                         actuatorTag.retSns = actuatorConfig.config.retSnsTag;
                         actuatorTag.ext = actuatorConfig.config.extTag;
-                        actuatorTag.ret = actuatorConfig.config.retTag;
-
-
+                        if(actuatorConfig.type !== 'singleActingSingleTag') {
+                            actuatorTag.ret = actuatorConfig.config.retTag;
+                        }
                     } else {
-                        actuatorTag.extSns = 'Sensor_' + cur[0] + '_Extended';
-                        actuatorTag.retSns = 'Sensor_' + cur[0] + '_Retracted';
+                        actuatorTag.extSns = 'Sensor_' + actuator + '_Extended';
+                        actuatorTag.retSns = 'Sensor_' + actuator + '_Retracted';
                         actuatorTag.ext = 'Cylinder_' + actuator + '_Extend';
                         actuatorTag.ret = 'Cylinder_' + actuator + '_Retract';
                     }
@@ -1463,17 +1449,23 @@ async function generateCode2(sequence, projectID, errors) {
                     if (!actuators.has(actuator)) {
                         actuators.add(actuator); // Add to set
                         setupCode.push('        ' + actuatorTag.ext + ' := FALSE;'); // Retract cylinder
-                        setupCode.push('        ' + actuatorTag.ret + ' := TRUE;'); // Retract cylinder
+                        if(actuatorTag.ret) {
+                            setupCode.push('        ' + actuatorTag.ret + ' := TRUE;'); // Retract cylinder
+                        }
                     }
 
                     if (action === '-') {
                         logicCode.push('                ' + actuatorTag.ext + ' := FALSE;'); // Retract cylinder
-                        logicCode.push('                ' + actuatorTag.ret + ' := TRUE;'); // Retract cylinder
+                        if(actuatorTag.ret) {
+                            logicCode.push('                ' + actuatorTag.ret + ' := TRUE;'); // Retract cylinder
+                        }
                         ifString = ' AND (' + actuatorTag.extSns + ' AND (NOT ' + actuatorTag.retSns + ')) THEN ';
                     }
 
                     if (action === '+') {
-                        logicCode.push('                ' + actuatorTag.ret + ' := FALSE;'); // Extend cylinder
+                        if(actuatorTag.ret) {
+                            logicCode.push('                ' + actuatorTag.ret + ' := FALSE;'); // Extend cylinder
+                        }
                         logicCode.push('                ' + actuatorTag.ext + ' := TRUE;'); // Extend cylinder
                         ifString = ' AND ((NOT ' + actuatorTag.extSns + ') AND ' + actuatorTag.retSns + ') THEN ';
                     }
@@ -1556,7 +1548,9 @@ async function generateCode2(sequence, projectID, errors) {
                     actuatorTag.extSns = actuatorConfig.config.extSnsTag;
                     actuatorTag.retSns = actuatorConfig.config.retSnsTag;
                     actuatorTag.ext = actuatorConfig.config.extTag;
-                    actuatorTag.ret = actuatorConfig.config.retTag;
+                    if(actuatorConfig.type !== 'singleActingSingleTag') {
+                        actuatorTag.ret = actuatorConfig.config.retTag;
+                    }
                 } else {
                     actuatorTag.extSns = 'Sensor_' + actuator + '_Extended';
                     actuatorTag.retSns = 'Sensor_' + actuator + '_Retracted';
@@ -1567,17 +1561,23 @@ async function generateCode2(sequence, projectID, errors) {
                 if (!actuators.has(actuator)) {
                     actuators.add(actuator); // Add to set
                     setupCode.push('        ' + actuatorTag.ext + ' := FALSE;'); // Retract cylinder
-                    setupCode.push('        ' + actuatorTag.ret + ' := TRUE;'); // Retract cylinder
+                    if(actuatorTag.ret) {
+                        setupCode.push('        ' + actuatorTag.ret + ' := TRUE;'); // Retract cylinder
+                    }
                 }
 
                 if (action === '-') {
                     logicCode.push('                ' + actuatorTag.ext + ' := FALSE;'); // Retract cylinder
-                    logicCode.push('                ' + actuatorTag.ret + ' := TRUE;'); // Retract cylinder
+                    if(actuatorTag.ret) {
+                        logicCode.push('                ' + actuatorTag.ret + ' := TRUE;'); // Retract cylinder
+                    }
                     ifString = ' AND (' + actuatorTag.extSns + ' AND (NOT ' + actuatorTag.retSns + ')) THEN ';
                 }
 
                 if (action === '+') {
-                    logicCode.push('                ' + actuatorTag.ret + ' := FALSE;'); // Extend cylinder
+                    if(actuatorTag.ret) {
+                        logicCode.push('                ' + actuatorTag.ret + ' := FALSE;'); // Extend cylinder
+                    }
                     logicCode.push('                ' + actuatorTag.ext + ' := TRUE;'); // Extend cylinder
                     ifString = ' AND ((NOT ' + actuatorTag.extSns + ') AND ' + actuatorTag.retSns + ') THEN ';
                 }

@@ -434,7 +434,7 @@ const generate = () => {
     document.getElementById('incorrect_code').innerHTML = 'Generating...';
     document.getElementById('xmlTags').innerText = 'Generating...';
 
-    fetch(backend + '/sequence/generate2/' + projectDetails.sequence + '/' + errors + '/' + projectDetails.id)
+    fetch(backend + '/sequence/generate2/' + projectDetails.sequence + '/' + errors + (projectDetails.id ? '/' + projectDetails.id : ''))
         .then(o => o.json())
         .then(response => {
             let correct, incorrect;
