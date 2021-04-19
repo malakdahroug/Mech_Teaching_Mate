@@ -1471,7 +1471,7 @@ async function generateCode2(sequence, projectID, errors) {
                     }
 
                     if (currentCase !== 10) {
-                        if (logicCode[lastIndex].search('Timer') !== -1) {
+                        if (logicCode[lastIndex].search(':= FALSE') !== -1) {
                             logicCode[lastIndex - 1] = logicCode[lastIndex - 1].substr(0, logicCode[lastIndex - 1].length - 6) + ifString;
                         } else {
                             logicCode[lastIndex] = logicCode[lastIndex].substr(0, logicCode[lastIndex].length - 6) + ifString;
@@ -1583,7 +1583,7 @@ async function generateCode2(sequence, projectID, errors) {
                 }
 
                 if (currentCase !== 10) {
-                    if (logicCode[lastIndex].search('Timer') !== -1) {
+                    if (logicCode[lastIndex].search(':= FALSE') !== -1) {
                         logicCode[lastIndex - 1] = logicCode[lastIndex - 1].substr(0, logicCode[lastIndex - 1].length - 6) + ifString;
                     } else {
                         logicCode[lastIndex] = logicCode[lastIndex].substr(0, logicCode[lastIndex].length - 6) + ifString;
@@ -1599,9 +1599,11 @@ async function generateCode2(sequence, projectID, errors) {
                 const timerConfig = sequenceElements.find((e) => {
                     return e.label === 'Timer_' + timerCount;
                 });
-                timerTag.power = timerConfig.config.powerTag;
-                timerTag.completed = timerConfig.config.completedTag;
-                timerTag.elapsedTime = timerConfig.config.elapsedTimeTag;
+                if(timerConfig) {
+                    timerTag.power = timerConfig.config.powerTag;
+                    timerTag.completed = timerConfig.config.completedTag;
+                    timerTag.elapsedTime = timerConfig.config.elapsedTimeTag;
+                }
             } else {
                 timerTag.power = 'Timer_' + timerCount + '_Start';
                 timerTag.completed = 'Timer_' + timerCount + '_Finished';
@@ -1791,9 +1793,9 @@ async function generateCode2(sequence, projectID, errors) {
             timerTag.power = 'Timer_' + (i + 1) + '_Start';
         }
 
-        actions.push({type: 'Bool', txt: 'Timer_' + i + '_Start'});
-        actions.push({type: 'Bool', txt: 'Timer_' + i + '_Finished'});
-        actions.push({type: 'Time', txt: 'Timer_' + i + '_Elapsed'});
+        actions.push({type: 'Bool', txt: 'Timer_' + (i + 1) + '_Start'});
+        actions.push({type: 'Bool', txt: 'Timer_' + (i + 1) + '_Finished'});
+        actions.push({type: 'Time', txt: 'Timer_' + (i + 1) + '_Elapsed'});
         setupCode.push('        ' + timerTag.power + ' := FALSE;');
     }
 
