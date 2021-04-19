@@ -67,7 +67,7 @@ app.get('/project/create/:id/:name/:sequence', async function (req, res) {
     res.header("Access-Control-Allow-Origin", "*");
 
     // Check validity of the sequence provided - if the sequence is correct the project will be added to the database
-    const validator = isValid(req.params.sequence.toUpperCase().split(','));
+    const validator = isValid(req.params.sequence.toUpperCase().replaceAll(/\s/g, "").split(','));
     const validity = validator.length === 0;
 
     // If sequence provided is valid, add the project to the database and create a ProjectConfig for it
@@ -76,13 +76,13 @@ app.get('/project/create/:id/:name/:sequence', async function (req, res) {
         const newProject = new Project({
             user_id: req.params.id,
             project_name: req.params.name,
-            project_sequence: req.params.sequence.toUpperCase(),
+            project_sequence: req.params.sequence.toUpperCase().replaceAll(/\s/g, ""),
             validity: validity
         });
 
         // Try to get records from the database that match the sequence provided and id of the user
         const project = await Project.find({
-            project_sequence: req.params.sequence.toUpperCase(),
+            project_sequence: req.params.sequence.toUpperCase().replaceAll(/\s/g, ""),
             user_id: req.params.id
         }).exec();
 
@@ -127,7 +127,7 @@ app.get('/project/get/:project_id', async function (req, res) {
     const projectConfig = await ProjectConfig.findOne({project_id: req.params.project_id}).exec();
 
     // Break down the sequence from the project configuration (using commas as a separator)
-    const sequence = project.project_sequence.toUpperCase().split(',');
+    const sequence = project.project_sequence.toUpperCase().replaceAll(/\s/g, "").split(',');
 
     // Goes through the sequence and returns list of components for the given sequence
     const components = getComponents(sequence);
@@ -398,7 +398,7 @@ app.get('/sequence/isValid/:sequence', function (req, res) {
     res.header("Access-Control-Allow-Origin", "*");
     res.setHeader('Content-Type', 'application/json');
 
-    let sequence = req.params.sequence.toUpperCase().split(',');
+    let sequence = req.params.sequence.toUpperCase().replaceAll(/\s/g, "").split(',');
 
     const sequenceValidator = isValid(sequence);
 
@@ -419,58 +419,58 @@ app.get('/sequence/isValid/:sequence', function (req, res) {
     // #END - For testing only - if not running tests - comment
 });
 
-// New route for generating code with errors
-app.get('/sequence/generate/:sequence/:sensorsPresent/:withFaults', function (req, res) {
-    // Temporary Cross Origin workaround
-    res.header("Access-Control-Allow-Origin", "*");
-
-    const sequenceQueue = new queue(); // Instantiates a new Queue for the client and stores it in a constant sequenceQueue
-
-    // If sensorsPresent URL param is set to 1 it means sequence should be generated with sensors included
-    const sensors = req.params.sensorsPresent === '1';
-
-    // Splitting withFaults parameter by comma as they arrive in the following form 1,easy/hard/medium or 0,none
-    // If the value before comma is one it means sequence is supposed to be generated with errors
-    // The second parameter (after comma) controls the difficulty
-    const faultsSettings = req.params.withFaults.split(',');
-
-    // If the first URL parameter (withFaults) is set to 1, faults settings will be set to true which will result
-    // in generating code with errors
-    const faults = faultsSettings[0] === '1';
-
-    // Errors complexity is extracted from the second parameter of withFaults
-    const complexity = faultsSettings[1];
-
-    // Takes a sequence from a URL parameter, converts it to uppercase letter and splits it by commas
-    // The result will form an array of each of the actuations
-    let sequenceType = '';
-
-    // Each of the regular expression below is supposed to detect different type of sequence, if it is matching
-    // a regular expression it will add 1 to the sequence type string, otherwise it will add 0
-
-    // Regular expression that detects if sequence has multiple actuations occurring at once
-    sequenceType += ((req.params.sequence.toUpperCase().search(/\((([A-Z](\+|\-),)|([1-9]+[0-9]*S,))+([A-Z](\+|\-)|([1-9]+[0-9]*S))\)/) !== -1) ? 1 : 0);
-
-    // Regular expression that detects if sequence has repeated actions (e.g. through a counter)
-    sequenceType += ((req.params.sequence.toUpperCase().search(/\[(([A-Z](\+|\-),)|([1-9]+[0-9]*S,))*([A-Z](\+|\-)\)|([1-9]+[0-9]*S))\]\^([2-9]|[1-9]+[0-9]+)/) !== -1) ? 1 : 0);
-
-    // Regular expression that detects if sequence includes a timer
-    sequenceType += ((req.params.sequence.toUpperCase().search(/([1-9]+[0-9]*S)/) !== -1) ? 1 : 0);
-
-    let sequence = req.params.sequence.toUpperCase().split(',');
-
-    // If concurrent, repetitive or timed sequence was detected it will return an error informing these types of sequences are not currently supported
-    if (sequenceType !== '000') {
-        res.send({correct: 'Concurrent, repetitive and timed sequences are not currently supported!'});
-    } else {
-        // Prepare code object - it will contain both correct and incorrect sequences
-        let code = {
-            correct: generateCode(sequence, sequenceQueue, sensors, 0, ''),
-            incorrect: generateCode(sequence, sequenceQueue, sensors, faults, complexity)
-        }
-        res.send(code); // Sends response to the client
-    }
-});
+// // New route for generating code with errors
+// app.get('/sequence/generate/:sequence/:sensorsPresent/:withFaults', function (req, res) {
+//     // Temporary Cross Origin workaround
+//     res.header("Access-Control-Allow-Origin", "*");
+//
+//     const sequenceQueue = new queue(); // Instantiates a new Queue for the client and stores it in a constant sequenceQueue
+//
+//     // If sensorsPresent URL param is set to 1 it means sequence should be generated with sensors included
+//     const sensors = req.params.sensorsPresent === '1';
+//
+//     // Splitting withFaults parameter by comma as they arrive in the following form 1,easy/hard/medium or 0,none
+//     // If the value before comma is one it means sequence is supposed to be generated with errors
+//     // The second parameter (after comma) controls the difficulty
+//     const faultsSettings = req.params.withFaults.split(',');
+//
+//     // If the first URL parameter (withFaults) is set to 1, faults settings will be set to true which will result
+//     // in generating code with errors
+//     const faults = faultsSettings[0] === '1';
+//
+//     // Errors complexity is extracted from the second parameter of withFaults
+//     const complexity = faultsSettings[1];
+//
+//     // Takes a sequence from a URL parameter, converts it to uppercase letter and splits it by commas
+//     // The result will form an array of each of the actuations
+//     let sequenceType = '';
+//
+//     // Each of the regular expression below is supposed to detect different type of sequence, if it is matching
+//     // a regular expression it will add 1 to the sequence type string, otherwise it will add 0
+//
+//     // Regular expression that detects if sequence has multiple actuations occurring at once
+//     sequenceType += ((req.params.sequence.toUpperCase().search(/\((([A-Z](\+|\-),)|([1-9]+[0-9]*S,))+([A-Z](\+|\-)|([1-9]+[0-9]*S))\)/) !== -1) ? 1 : 0);
+//
+//     // Regular expression that detects if sequence has repeated actions (e.g. through a counter)
+//     sequenceType += ((req.params.sequence.toUpperCase().search(/\[(([A-Z](\+|\-),)|([1-9]+[0-9]*S,))*([A-Z](\+|\-)\)|([1-9]+[0-9]*S))\]\^([2-9]|[1-9]+[0-9]+)/) !== -1) ? 1 : 0);
+//
+//     // Regular expression that detects if sequence includes a timer
+//     sequenceType += ((req.params.sequence.toUpperCase().search(/([1-9]+[0-9]*S)/) !== -1) ? 1 : 0);
+//
+//     let sequence = req.params.sequence.toUpperCase().split(',');
+//
+//     // If concurrent, repetitive or timed sequence was detected it will return an error informing these types of sequences are not currently supported
+//     if (sequenceType !== '000') {
+//         res.send({correct: 'Concurrent, repetitive and timed sequences are not currently supported!'});
+//     } else {
+//         // Prepare code object - it will contain both correct and incorrect sequences
+//         let code = {
+//             correct: generateCode(sequence, sequenceQueue, sensors, 0, ''),
+//             incorrect: generateCode(sequence, sequenceQueue, sensors, faults, complexity)
+//         }
+//         res.send(code); // Sends response to the client
+//     }
+// });
 
 // Sequence validation route
 app.get('/sequence/generate2/:sequence/:errors/:projectID?', async function (req, res) {
@@ -907,200 +907,200 @@ function isValid(sequence) {
     return Array.from(errorSet);
 }
 
-/**
- * Function responsible for generating PLC code
- *
- * @param sequence an array containing initially processed sequence
- * @param q empty Queue prepared for sequence generation
- * @param sensors true if sensors are present, false if sensors are not present
- * @param faults boolean that controls whether to generate correct code or code with errors
- * @param complexity complexity of faults generated
- * @returns {string} generated code based on the given sequence
- */
-function generateCode(sequence, q, sensors, faults, complexity) {
-    // Add all elements from the sequence array to the Queue
-    for (const element of sequence) {
-        q.enqueue(element);
-    }
-
-    // Initial code (sequence setup) that will contain all the setup info e.g. cylinders retracted, timers reset etc
-    let setupCode = [];
-
-    // Create a set for all actuators
-    let actuators = new Set([]);
-
-    // Actual logics code for each of the actions in the sequence
-    let logicCode = [];
-
-    // Create setup code and case 0, so e.g. all cylinders can start in their desired positions
-    setupCode.push('CASE #NEXT OF');
-    setupCode.push('    0:');
-
-    // Defines a validator (Regular expression) for a valid input - currently it is capable of validating the following options:
-    // A-Z -> cylinder to actuate
-    // + -> extend cylinder
-    // - -> retract cylinder
-    // A+ -> valid, A- -> valid, A3 -> invalid
-    const validator = /[A-Z](\+|\-)/i;
-    let invalid = false;
-    let invalidElements = [];
-    let currentCase = 10; // Current case count for actuations
-
-    let actionCount = 0;
-
-    // Keeps iterating until the queue is fully emptied
-    while (!q.isEmpty()) {
-        // Empty the first element in the queue and assign it to element variable
-        const element = q.dequeue();
-        actionCount++;
-        if (element.length !== 2) {
-            invalid = true;
-            invalidElements.push(element);
-            // If element is correct i.e. matches the regular expression given
-        } else if (element.match(validator)) {
-
-            // Checks if actuator is an actuator set, if it's not it's going to add it to the set
-            // and add it's setup action (for now cylinder retracted) to the setup code
-            if (!actuators.has(element[0])) {
-                actuators.add(element[0]); // Add to set
-                setupCode.push('        Cylinder_' + element[0] + '_Extend := FALSE;'); // Retract cylinder
-                setupCode.push('        Cylinder_' + element[0] + '_Retract := TRUE;'); // Retract cylinder
-            }
-
-            // Add current case count
-            logicCode.push('    ' + currentCase + ':');
-
-            // Increase case count for the next operation
-            currentCase += 10;
-
-            // Checks if it is extension
-            if (element[1] === '+') {
-                // Add extension actuation to the logicCode
-                if (sensors) {
-                    logicCode.push('        IF "Cylinder_' + element[0] + '_Ret_Sensor" THEN');
-                    logicCode.push('            Cylinder_' + element[0] + '_Extend := TRUE;'); // Extend cylinder
-                    logicCode.push('            Cylinder_' + element[0] + '_Retract := FALSE;'); // Extend cylinder
-                    logicCode.push('            #NEXT := ' + currentCase + ';'); // Move to the next case
-                    logicCode.push('        END_IF;<br>'); // Retract cylinder
-                } else {
-                    logicCode.push('        Cylinder_' + element[0] + '_Extend := TRUE;'); // Extend cylinder
-                    logicCode.push('        Cylinder_' + element[0] + '_Retract := FALSE;'); // Extend cylinder
-                    logicCode.push('        #NEXT := ' + currentCase + ';<br>'); // Move to the next case
-                }
-                // Checks if it is retraction
-            } else if (element[1] === '-') {
-                // Add retraction actuation to the logicCode
-                if (sensors) {
-                    logicCode.push('        IF "Cylinder_' + element[0] + '_Ext_Sensor" THEN');
-                    logicCode.push('            Cylinder_' + element[0] + '_Extend := FALSE;'); // Retract cylinder
-                    logicCode.push('            Cylinder_' + element[0] + '_Retract := TRUE;'); // Retract cylinder
-                    logicCode.push('            #NEXT := ' + currentCase + ';'); // Move to the next case
-                    logicCode.push('        END_IF;<br>'); // Retract cylinder
-                } else {
-                    logicCode.push('        Cylinder_' + element[0] + '_Extend := FALSE;'); // Retract cylinder
-                    logicCode.push('        Cylinder_' + element[0] + '_Retract := TRUE;'); // Retract cylinder
-                    logicCode.push('        #NEXT := ' + currentCase + ';<br>'); // Move to the next case
-                }
-            }
-
-            // If current element in the queue is not a valid expression, it will set invalid to true
-            // it will also add the invalid elements in the sequence to the invalidArray, which later on will be
-            // displayed to the user
-        } else {
-            invalid = true;
-            invalidElements.push(element);
-        }
-    }
-
-    // If invalid element was detected, it will return the message with invalid elements in the sequence
-    if (invalid) {
-        return 'The sequence provided is invalid, please check the following part of the sequence "' + invalidElements + '"!';
-    }
-
-    // Add next jump to first actuation case at the end of setup case
-    setupCode.push('        #NEXT := 10;' + '<br>');
-
-    // If sensors are used then it removes second to last element from logicCode array
-    // It will remove #NEXT := case jump as there's no next case (second to last element)
-    // If sensors are not used it will also remove #NEXT := case jump by removing the last element from logicCode array
-    if (sensors) {
-        logicCode.splice(logicCode.length - 2, 1);
-    } else {
-        logicCode.splice(logicCode.length - 1, 1);
-    }
-
-    // After code is generated, the function checks if faults parameter is set to true
-    // If it is it will modify logic code to generate some errors
-    if (faults) {
-
-        // Setting initial value of faultsLimit to 0, it will be amended depending on complexity chosen
-        // Using a formulae from the next set of if - else-if statements
-        let faultsLimit = 0;
-
-        // Current number of errors generated
-        let faultsCount = 0;
-        if (complexity === 'easy') {
-            faultsLimit = Math.ceil(logicCode.length / 5);
-        } else if (complexity === 'medium') {
-            faultsLimit = Math.ceil(logicCode.length / 4);
-        } else if (complexity === 'hard') {
-            faultsLimit = Math.ceil(logicCode.length / 3);
-        }
-
-        // If number of generated faults is less than a limit - it will keep repeating until it generates enough errors
-        while (faultsCount < faultsLimit) {
-
-            // It will keep iterating through logicCode array
-            for (let i = 0; i < logicCode.length; i++) {
-
-                // Checks if enough faults were generated already, if so - it will break the loop as well as condition
-                // of the while loop won't be satisfied anymore
-                if (faultsCount >= faultsLimit) {
-                    break;
-                }
-
-                // Generates a pseudo random number between 0 and 10,
-                // if the number is smaller than 3 (which maps to roughly 30% chances of error being generated in that line)
-                // it will then generate an error
-                if (Math.floor(Math.random() * 10) < 3) {
-                    // Generates a random number between 0 and 2 to decide which type of fault to include
-                    // - 0 -> will shift line of code 2 lines forward (for the last 3 lines it will shift them 2 lines backward)
-                    // - 1 -> it will remove up to 3 characters from the end of the string
-                    // - 2 -> it will completely remove the line of code
-                    let faultOption = Math.floor(Math.random() * 3);
-                    switch (faultOption) {
-                        case 0:
-                            let currentElement = logicCode[i];
-                            if (i >= logicCode.length - 3) {
-                                logicCode[i] = logicCode[i - 2];
-                                logicCode[i - 2] = currentElement;
-                            } else {
-                                logicCode[i] = logicCode[i + 2];
-                                logicCode[i + 2] = currentElement;
-                            }
-                            break;
-                        case 1:
-                            logicCode[i] = logicCode[i].substring(0, logicCode[i].length - Math.ceil(Math.random() * 3));
-                            break;
-                        case 2:
-                            logicCode.splice(i, 1);
-                            break;
-                    }
-
-                    // When the fault was generated increment faultCount
-                    faultsCount++;
-                }
-            }
-        }
-    }
-
-    // Generate the string containing the code, by joining setupCode array with line breaks followed by one more line break
-    // and logicCode array joined with line breaks
-    let outputCode = setupCode.join('<br>') + '<br>' + logicCode.join('<br>');
-
-    // If there were no errors in the sequence it will return the generated code to the user
-    return outputCode;
-}
+// /**
+//  * Function responsible for generating PLC code
+//  *
+//  * @param sequence an array containing initially processed sequence
+//  * @param q empty Queue prepared for sequence generation
+//  * @param sensors true if sensors are present, false if sensors are not present
+//  * @param faults boolean that controls whether to generate correct code or code with errors
+//  * @param complexity complexity of faults generated
+//  * @returns {string} generated code based on the given sequence
+//  */
+// function generateCode(sequence, q, sensors, faults, complexity) {
+//     // Add all elements from the sequence array to the Queue
+//     for (const element of sequence) {
+//         q.enqueue(element);
+//     }
+//
+//     // Initial code (sequence setup) that will contain all the setup info e.g. cylinders retracted, timers reset etc
+//     let setupCode = [];
+//
+//     // Create a set for all actuators
+//     let actuators = new Set([]);
+//
+//     // Actual logics code for each of the actions in the sequence
+//     let logicCode = [];
+//
+//     // Create setup code and case 0, so e.g. all cylinders can start in their desired positions
+//     setupCode.push('CASE #NEXT OF');
+//     setupCode.push('    0:');
+//
+//     // Defines a validator (Regular expression) for a valid input - currently it is capable of validating the following options:
+//     // A-Z -> cylinder to actuate
+//     // + -> extend cylinder
+//     // - -> retract cylinder
+//     // A+ -> valid, A- -> valid, A3 -> invalid
+//     const validator = /[A-Z](\+|\-)/i;
+//     let invalid = false;
+//     let invalidElements = [];
+//     let currentCase = 10; // Current case count for actuations
+//
+//     let actionCount = 0;
+//
+//     // Keeps iterating until the queue is fully emptied
+//     while (!q.isEmpty()) {
+//         // Empty the first element in the queue and assign it to element variable
+//         const element = q.dequeue();
+//         actionCount++;
+//         if (element.length !== 2) {
+//             invalid = true;
+//             invalidElements.push(element);
+//             // If element is correct i.e. matches the regular expression given
+//         } else if (element.match(validator)) {
+//
+//             // Checks if actuator is an actuator set, if it's not it's going to add it to the set
+//             // and add it's setup action (for now cylinder retracted) to the setup code
+//             if (!actuators.has(element[0])) {
+//                 actuators.add(element[0]); // Add to set
+//                 setupCode.push('        Cylinder_' + element[0] + '_Extend := FALSE;'); // Retract cylinder
+//                 setupCode.push('        Cylinder_' + element[0] + '_Retract := TRUE;'); // Retract cylinder
+//             }
+//
+//             // Add current case count
+//             logicCode.push('    ' + currentCase + ':');
+//
+//             // Increase case count for the next operation
+//             currentCase += 10;
+//
+//             // Checks if it is extension
+//             if (element[1] === '+') {
+//                 // Add extension actuation to the logicCode
+//                 if (sensors) {
+//                     logicCode.push('        IF "Cylinder_' + element[0] + '_Ret_Sensor" THEN');
+//                     logicCode.push('            Cylinder_' + element[0] + '_Extend := TRUE;'); // Extend cylinder
+//                     logicCode.push('            Cylinder_' + element[0] + '_Retract := FALSE;'); // Extend cylinder
+//                     logicCode.push('            #NEXT := ' + currentCase + ';'); // Move to the next case
+//                     logicCode.push('        END_IF;<br>'); // Retract cylinder
+//                 } else {
+//                     logicCode.push('        Cylinder_' + element[0] + '_Extend := TRUE;'); // Extend cylinder
+//                     logicCode.push('        Cylinder_' + element[0] + '_Retract := FALSE;'); // Extend cylinder
+//                     logicCode.push('        #NEXT := ' + currentCase + ';<br>'); // Move to the next case
+//                 }
+//                 // Checks if it is retraction
+//             } else if (element[1] === '-') {
+//                 // Add retraction actuation to the logicCode
+//                 if (sensors) {
+//                     logicCode.push('        IF "Cylinder_' + element[0] + '_Ext_Sensor" THEN');
+//                     logicCode.push('            Cylinder_' + element[0] + '_Extend := FALSE;'); // Retract cylinder
+//                     logicCode.push('            Cylinder_' + element[0] + '_Retract := TRUE;'); // Retract cylinder
+//                     logicCode.push('            #NEXT := ' + currentCase + ';'); // Move to the next case
+//                     logicCode.push('        END_IF;<br>'); // Retract cylinder
+//                 } else {
+//                     logicCode.push('        Cylinder_' + element[0] + '_Extend := FALSE;'); // Retract cylinder
+//                     logicCode.push('        Cylinder_' + element[0] + '_Retract := TRUE;'); // Retract cylinder
+//                     logicCode.push('        #NEXT := ' + currentCase + ';<br>'); // Move to the next case
+//                 }
+//             }
+//
+//             // If current element in the queue is not a valid expression, it will set invalid to true
+//             // it will also add the invalid elements in the sequence to the invalidArray, which later on will be
+//             // displayed to the user
+//         } else {
+//             invalid = true;
+//             invalidElements.push(element);
+//         }
+//     }
+//
+//     // If invalid element was detected, it will return the message with invalid elements in the sequence
+//     if (invalid) {
+//         return 'The sequence provided is invalid, please check the following part of the sequence "' + invalidElements + '"!';
+//     }
+//
+//     // Add next jump to first actuation case at the end of setup case
+//     setupCode.push('        #NEXT := 10;' + '<br>');
+//
+//     // If sensors are used then it removes second to last element from logicCode array
+//     // It will remove #NEXT := case jump as there's no next case (second to last element)
+//     // If sensors are not used it will also remove #NEXT := case jump by removing the last element from logicCode array
+//     if (sensors) {
+//         logicCode.splice(logicCode.length - 2, 1);
+//     } else {
+//         logicCode.splice(logicCode.length - 1, 1);
+//     }
+//
+//     // After code is generated, the function checks if faults parameter is set to true
+//     // If it is it will modify logic code to generate some errors
+//     if (faults) {
+//
+//         // Setting initial value of faultsLimit to 0, it will be amended depending on complexity chosen
+//         // Using a formulae from the next set of if - else-if statements
+//         let faultsLimit = 0;
+//
+//         // Current number of errors generated
+//         let faultsCount = 0;
+//         if (complexity === 'easy') {
+//             faultsLimit = Math.ceil(logicCode.length / 5);
+//         } else if (complexity === 'medium') {
+//             faultsLimit = Math.ceil(logicCode.length / 4);
+//         } else if (complexity === 'hard') {
+//             faultsLimit = Math.ceil(logicCode.length / 3);
+//         }
+//
+//         // If number of generated faults is less than a limit - it will keep repeating until it generates enough errors
+//         while (faultsCount < faultsLimit) {
+//
+//             // It will keep iterating through logicCode array
+//             for (let i = 0; i < logicCode.length; i++) {
+//
+//                 // Checks if enough faults were generated already, if so - it will break the loop as well as condition
+//                 // of the while loop won't be satisfied anymore
+//                 if (faultsCount >= faultsLimit) {
+//                     break;
+//                 }
+//
+//                 // Generates a pseudo random number between 0 and 10,
+//                 // if the number is smaller than 3 (which maps to roughly 30% chances of error being generated in that line)
+//                 // it will then generate an error
+//                 if (Math.floor(Math.random() * 10) < 3) {
+//                     // Generates a random number between 0 and 2 to decide which type of fault to include
+//                     // - 0 -> will shift line of code 2 lines forward (for the last 3 lines it will shift them 2 lines backward)
+//                     // - 1 -> it will remove up to 3 characters from the end of the string
+//                     // - 2 -> it will completely remove the line of code
+//                     let faultOption = Math.floor(Math.random() * 3);
+//                     switch (faultOption) {
+//                         case 0:
+//                             let currentElement = logicCode[i];
+//                             if (i >= logicCode.length - 3) {
+//                                 logicCode[i] = logicCode[i - 2];
+//                                 logicCode[i - 2] = currentElement;
+//                             } else {
+//                                 logicCode[i] = logicCode[i + 2];
+//                                 logicCode[i + 2] = currentElement;
+//                             }
+//                             break;
+//                         case 1:
+//                             logicCode[i] = logicCode[i].substring(0, logicCode[i].length - Math.ceil(Math.random() * 3));
+//                             break;
+//                         case 2:
+//                             logicCode.splice(i, 1);
+//                             break;
+//                     }
+//
+//                     // When the fault was generated increment faultCount
+//                     faultsCount++;
+//                 }
+//             }
+//         }
+//     }
+//
+//     // Generate the string containing the code, by joining setupCode array with line breaks followed by one more line break
+//     // and logicCode array joined with line breaks
+//     let outputCode = setupCode.join('<br>') + '<br>' + logicCode.join('<br>');
+//
+//     // If there were no errors in the sequence it will return the generated code to the user
+//     return outputCode;
+// }
 
 function generateErrors(code, complexity, actuators) {
     actuators = Array.from(actuators);
@@ -1388,7 +1388,7 @@ async function generateCode2(sequence, projectID, errors) {
                     }
 
                     ifString += '(' + timerTag.completed + ') AND ';
-                    resetTimer.push('                ' + timerTag.power + ' := TRUE;'); // Retract cylinder
+                    resetTimer.push('                ' + timerTag.power + ' := FALSE;'); // Retract cylinder
                 }
             }
             ifString = ifString.substr(0, ifString.length - 5);
@@ -1499,13 +1499,13 @@ async function generateCode2(sequence, projectID, errors) {
 
                     if (tempCurrent.search('T+') !== -1) {
                         currentTime = currentTime.replaceAll('T+', '').replaceAll('S', '')
-                        time = '(T_VARIABLE + ' + currentTime + ')';
+                        time = '("T_VARIABLE" + ' + currentTime + ')';
                         isTVarSet = true;
                     } else if (tempCurrent.search('T') !== -1) {
-                        time = 'T_VARIABLE';
+                        time = '"T_VARIABLE"';
                         isTVarSet = true;
                     } else {
-                        currentTime = currentTime.replaceAll('T', '').replaceAll('S', '').replaceAll('+', '').replaceAll(']', '');
+                        currentTime = currentTime.replaceAll('T', '').replaceAll('+', '').replaceAll(']', '');
                         time = currentTime;
                     }
 
@@ -1524,7 +1524,7 @@ async function generateCode2(sequence, projectID, errors) {
                     }
 
                     componentsCode.push('"IEC_Timer_' + (timerCount - 1) + '_DB".TON(IN:="' + timer.power + '",');
-                    componentsCode.push('                     PT:=t#' + time + ',');
+                    componentsCode.push('                     PT:=' + (time.startsWith('"T_VAR') ? 'INT_TO_TIME((' + time +') * 1000)' : 't#' + time) +',');
                     componentsCode.push('                     Q=>"' + timer.completed + '",');
                     componentsCode.push('                     ET=>"' + timer.elapsedTime + '");\n');
                     timerCount++;
@@ -1616,11 +1616,11 @@ async function generateCode2(sequence, projectID, errors) {
                 let variableTime = false;
                 let currentTime = current;
                 if (current.startsWith('T+')) {
-                    time = 'T_VARIABLE + ';
+                    time = '"T_VARIABLE" + ';
                     isTVarSet = true;
                     variableTime = true;
                 } else if (current.startsWith('T')) {
-                    time = 'T_VARIABLE';
+                    time = '"T_VARIABLE"';
                     isTVarSet = true;
                     variableTime = true;
                 }
@@ -1632,7 +1632,7 @@ async function generateCode2(sequence, projectID, errors) {
                 time += currentTime;
 
                 componentsCode.push('"IEC_Timer_' + (timerCount - 1) + '_DB".TON(IN:="' + timerTag.power + '",');
-                componentsCode.push('                     PT:=t#' + time + ',');
+                componentsCode.push('                     PT:=' + (time.startsWith('"T_VAR') ? 'INT_TO_TIME((' + time +') * 1000)' : 't#' + time) +',');
                 componentsCode.push('                     Q=>"' + timerTag.completed + '",');
                 componentsCode.push('                     ET=>"' + timerTag.elapsedTime + '");\n');
                 timerCount++;
@@ -1746,7 +1746,6 @@ async function generateCode2(sequence, projectID, errors) {
                 }
             }
         }
-        ;
 
         logicCode[0] = logicCode[0].replace('THEN', ifString + 'THEN')
     }
