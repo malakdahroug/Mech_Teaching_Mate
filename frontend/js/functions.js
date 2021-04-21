@@ -437,48 +437,51 @@ const generate = () => {
     fetch(backend + '/sequence/generate2/' + projectDetails.sequence + '/' + errors + (projectDetails.id ? '/' + projectDetails.id : ''))
         .then(o => o.json())
         .then(response => {
-            let correct, incorrect;
-            console.log(response);
-            if (screen.width < 768) {
-                correct = response.msg.code.toString().replaceAll('    ', ' ');
-                if (errors !== '0,none') {
-                    incorrect = response.msg.incorrect.toString().replaceAll('    ', ' ');
+            if(response.status === 'OK') {
+                let correct, incorrect;
+                console.log(response);
+                if (screen.width < 768) {
+                    correct = response.msg.code.toString().replaceAll('    ', ' ');
+                    if (errors !== '0,none') {
+                        incorrect = response.msg.incorrect.toString().replaceAll('    ', ' ');
+                    }
+                } else {
+                    correct = response.msg.code.toString();
+                    if (errors !== '0,none') {
+                        incorrect = response.msg.incorrect.toString();
+                    }
+                }
+                document.getElementById('solutionButton').innerText = 'Show solution';
+                document.getElementById('correct_code').innerHTML = 'SOLUTION:\n\n' + correct;
+
+                if (response.msg.tags) {
+                    document.getElementById('xmlTags').style.display = 'inline-block';
+                    document.getElementById('xmlTagsBtn').style.display = 'inline-block';
+                    document.getElementById('xmlTags').innerText = response.msg.tags.toString();
+                } else {
+                    document.getElementById('xmlTags').style.display = 'none';
+                    document.getElementById('xmlTagsBtn').style.display = 'none';
+                }
+
+                if (errors === '0,none') {
+                    document.getElementById('correct_code').style.display = 'inline-block';
+                    document.getElementById('correctCodeBtn').style.display = 'inline-block';
+                    document.getElementById('incorrect_code').style.display = 'none';
+                    document.getElementById('incorrectCodeBtn').style.display = 'none';
+                    return false;
+                }
+
+                if (!(errors === '0,none')) {
+                    document.getElementById('solutionButton').style.display = 'inline-block';
+                    document.getElementById('incorrect_code').innerHTML = 'CODE WITH ERRORS:\n\n' + incorrect;
+                    document.getElementById('correct_code').style.display = 'none';
+                    document.getElementById('correctCodeBtn').style.display = 'none';
+                    document.getElementById('incorrect_code').style.display = 'inline-block';
+                    document.getElementById('incorrectCodeBtn').style.display = 'inline-block';
                 }
             } else {
-                correct = response.msg.code.toString();
-                if (errors !== '0,none') {
-                    incorrect = response.msg.incorrect.toString();
-                }
+                alert(response.msg.status);
             }
-            document.getElementById('solutionButton').innerText = 'Show solution';
-            document.getElementById('correct_code').innerHTML = 'SOLUTION:\n\n' + correct;
-
-            if (response.msg.tags) {
-                document.getElementById('xmlTags').style.display = 'inline-block';
-                document.getElementById('xmlTagsBtn').style.display = 'inline-block';
-                document.getElementById('xmlTags').innerText = response.msg.tags.toString();
-            } else {
-                document.getElementById('xmlTags').style.display = 'none';
-                document.getElementById('xmlTagsBtn').style.display = 'none';
-            }
-
-            if (errors === '0,none') {
-                document.getElementById('correct_code').style.display = 'inline-block';
-                document.getElementById('correctCodeBtn').style.display = 'inline-block';
-                document.getElementById('incorrect_code').style.display = 'none';
-                document.getElementById('incorrectCodeBtn').style.display = 'none';
-                return false;
-            }
-
-            if (!(errors === '0,none')) {
-                document.getElementById('solutionButton').style.display = 'inline-block';
-                document.getElementById('incorrect_code').innerHTML = 'CODE WITH ERRORS:\n\n' + incorrect;
-                document.getElementById('correct_code').style.display = 'none';
-                document.getElementById('correctCodeBtn').style.display = 'none';
-                document.getElementById('incorrect_code').style.display = 'inline-block';
-                document.getElementById('incorrectCodeBtn').style.display = 'inline-block';
-            }
-
         });
 }
 
