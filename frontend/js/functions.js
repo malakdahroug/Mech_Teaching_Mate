@@ -1,5 +1,5 @@
-const backend = 'http://localhost:3000';
-const commBackend = 'http://localhost:3005';
+const backend = 'https://mtm.dahroug.tech/backend';
+const commBackend = 'https://mtm.dahroug.tech/comm';
 
 let params = window.location.search.substr(1);
 const projectDetails = {id: '', sequence: ''};
@@ -438,6 +438,9 @@ const generate = () => {
         .then(o => o.json())
         .then(response => {
             if(response.status === 'OK') {
+                document.getElementById('sequenceError').innerHTML = '';
+                document.getElementById('sequenceError').classList.remove('error');
+
                 let correct, incorrect;
                 console.log(response);
                 if (screen.width < 768) {
@@ -480,7 +483,25 @@ const generate = () => {
                     document.getElementById('incorrectCodeBtn').style.display = 'inline-block';
                 }
             } else {
-                alert(response.msg.status);
+                document.getElementById('sequenceError').classList.add('error');
+                let errorString = '';
+                if(!response.retraction) {
+                    errorString = 'The sequence contains errors, please fix them before generating the code:<br>';
+                    for(const element of response.msg) {
+                        errorString += element + '<br>';
+                    }
+                } else {
+                    document.getElementById('solutionButton').style.display = 'none';
+                    document.getElementById('correct_code').style.display = 'none';
+                    document.getElementById('correctCodeBtn').style.display = 'none';
+                    document.getElementById('incorrect_code').style.display = 'none';
+                    document.getElementById('incorrectCodeBtn').style.display = 'none';
+                    document.getElementById('xmlTags').style.display = 'none';
+                    document.getElementById('xmlTagsBtn').style.display = 'none';
+                    errorString = response.msg;
+                }
+
+                document.getElementById('sequenceError').innerHTML = errorString;
             }
         });
 }
