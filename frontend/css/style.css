@@ -55,7 +55,7 @@ footer {
 }
 
 .content {
-    min-height: 76.5vh;
+    min-height: calc(100vh - 56px - 72px);
 }
 
 .pad1 {
@@ -150,6 +150,47 @@ footer {
 .bgdrop:hover {
     background: rgba(0, 0, 0, 0.05);
     text-decoration: none;
+}
+
+.home-content {
+    padding-bottom: 2rem;
+}
+
+.home-content h2 {
+    margin: 1rem;
+    text-align: center;
+}
+
+.home-content p {
+    margin: 2rem 0;
+    text-align: justify;
+    font-size: 1.15rem;
+    line-height: 1.75rem;
+}
+
+.home-content img {
+    box-shadow: 0 0 5px 2px #555;
+}
+
+.text-center img {
+    box-shadow: 0 0 5px 2px #555;
+    border-radius: 25%;
+}
+
+.text-center {
+    text-align: center;
+}
+
+.contact {
+    font-weight: bold;
+    letter-spacing: 2px;
+}
+
+.other-content p {
+    margin: 2rem 0;
+    text-align: justify;
+    font-size: 1.15rem;
+    line-height: 1.75rem;
 }
 
 @media (max-width: 767px) {

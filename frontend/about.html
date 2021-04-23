@@ -13,35 +13,31 @@
           href="https://unpkg.com/bootstrap-material-design@4.1.1/dist/css/bootstrap-material-design.min.css"
           integrity="sha384-wXznGJNEXNG1NFsbm0ugrLFMQPWswR3lds2VeinahP8N0zJw9VWSopbjv2x7WCvX" crossorigin="anonymous">
 </head>
-<body onLoad="setup('validator');">
+<body onLoad="setup('index');">
 <nav class="navbar navbar-expand-lg navbar-light bg-primary pad20" id="nav"></nav>
 <div id="modals"></div>
+
 <div class="container content">
-    <div class="row bg-light pad1">
-        <div class="col-lg other-content">
-            <h2 class="page-title">Sequence validator</h2>
-            <p><b>You can use this tool to validate automation sequences to be used in the system</b></p>
-            <p>The tool will take any sequence (in according to the guidance available on the <a
-                    href="instructions.html">Instructions</a> page) and return information about sequence validity. If
-                the incorrect sequence is provided, the list of errors will be returned instead. Each action containing
-                an error will be listed in a separate line.</p><br>
-            <form class="form-signin text-center">
-                <label for="sequence" class="sr-only">Sequence:</label>
-                <input type="text" id="sequence" class="form-control margin-b-2" placeholder="Sequence">
+    <div class="row">
+        <div class="col-lg bg-light home-content">
+            <h2>About</h2>
+            <p>My name is Malak Dahroug, I am a final year BEng Mechatronics student, studying at Middlesex University London and have created this web application as part of my final project.</p>
 
-                <div class="error" id="sequenceError"></div>
-            </form>
+            <p>Please do not hesitate to contact me if you have any queries, using the contact information below.</p>
             <div class="text-center">
-                <button class="btn btn-lg btn-primary" onClick="validateSequence();">Validate sequence</button>
+                <img src="imgs/malak.jpg" style="width: 40%; margin: 2rem; ">
             </div>
-            <pre id="codeblocks">
-                <code id="code"></code>
-            </pre>
 
+            <p class="text-center contact">
+                Email<br><a href="mailto: malak-dahroug@hotmail.com">malak-dahroug@hotmail.com</a><br><br>
+                LinkedIn<br><a href="https://www.linkedin.com/in/malak-dahroug-97067b195/?originalSubdomain=uk">https://www.linkedin.com/in/malak-dahroug-97067b195</a>
+            </p>
         </div>
     </div>
 </div>
+
 <footer class="bg-light text-center text-lg-start" id="footer"></footer>
+
 <!-- Optional JavaScript -->
 <!-- jQuery first, then Popper.js, then Bootstrap JS -->
 <script src="https://code.jquery.com/jquery-3.2.1.slim.min.js"
