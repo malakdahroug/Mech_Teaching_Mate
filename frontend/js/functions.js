@@ -1,8 +1,10 @@
 // Link to the backend
-const backend = 'https://mtm.dahroug.tech/backend';
+// const backend = 'https://mtm.dahroug.tech/backend';
+const backend = 'http://localhost:3000';
 
 // Link to the commstack
-const commBackend = 'https://mtm.dahroug.tech/comm';
+// const commBackend = 'https://mtm.dahroug.tech/comm';
+const commBackend = 'http://localhost:3005';
 
 // Extracting URL parameters (used on the generator page)
 let params = window.location.search.substr(1);
@@ -271,8 +273,15 @@ const executeSequence = () => {
             } else {
                 // If response status is not OK
 
+                // Only called if the sequence starts with retraction of cylinder (currently not supported)
+                if(response.retraction) {
+                    // Add CSS class to sequenceError element
+                    document.querySelector('#sequenceError').classList.add('error');
+                    document.querySelector('#sequenceError').innerHTML = response.msg;
+                }
+
                 // If the length of response msg property is greater than 0 (means there are sequence errors)
-                if(response.msg.length > 0) {
+                if(response.msg.length > 0 && !response.retraction) {
                     // Add CSS class to sequenceError element
                     document.querySelector('#sequenceError').classList.add('error');
                     // Prepare the variable to store error

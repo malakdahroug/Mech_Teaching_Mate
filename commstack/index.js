@@ -42,6 +42,45 @@ let plcList = [
     {name: 'PLC_5', ip: '192.168.0.42', state: true, stopSignal: false, currentUser: ''}
 ];
 
+/**
+ * Function that checks if the sequence contains cylinders that start with retraction e.g., A-,A+
+ * Will return true for this type of sequences
+ *
+ * @param sequence processed sequence array (converted to uppercase letters and whitespace removed)
+ * @returns {boolean} true if sequence contains any cylinder retracting before extending, false otherwise
+ */
+function startsWithRetract(sequence) {
+    // Regular expression to match actuator
+    const actuator = /[A-Z](\+|-)/;
+
+    // Set containing actuators
+    const actuators = new Set();
+
+    // Iterates through sequence element by element
+    for(let element of sequence) {
+
+        // Remove all brackets
+        element = element.replaceAll(/\(/g, '').replaceAll(/\[/g, '');
+        // Tries to match a string to the regular expression provided for actuator
+        const matchActuator = element.search(actuator);
+
+        // If it matched actuator
+        if (matchActuator !== -1 && element.search('T') === -1) {
+            // It checks if the action is retraction and the actuator is not known yet (it hasn't extended)
+            if(element[1] === '-' && !actuators.has(element[0])) {
+                // Breaks the loop and returns true
+                return true;
+            } else {
+                // If the actuator action is extend, it will add it to the set.
+                actuators.add(element[0]);
+            }
+        }
+    }
+
+    // If nothing was returned yet, return false
+    return false;
+}
+
 // Main function containing all logics of the simulated PLC
 async function main(sequence, ip, user) {
     try {
@@ -481,6 +520,11 @@ app.get('/sequence/:sequence/:ip/:user', async (req, res) => {
     } else {
         // Break the sequence down using commas (converts it to an array of actions), remove any white space and convert it to all capitals
         const sequence = req.params.sequence.toUpperCase().replaceAll(/\s/g, "").split(',');
+
+        if(startsWithRetract(sequence)) {
+            res.send({status: 'Error', msg: 'The sequences starting with extended cylinders are currently not supported!', retraction: true});
+            return;
+        }
 
         // Get IP of the PLC from the URL parameter
         const ip = req.params.ip;
