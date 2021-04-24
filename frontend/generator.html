@@ -19,8 +19,21 @@
 <div id="modals"></div>
 <div class="container content">
     <div class="row bg-light pad1">
-        <div class="col-lg">
+        <div class="col-lg other-content">
             <h2 class="page-title">Code generator</h2>
+            <p><b>You can use this tool to generate SCL code for the given PLC sequence. The generator can also generate
+                code with mistakes that can be solved.</b></p>
+            <p>The tool will take any sequence (in according to the guidance available on the <a
+                    href="instructions.html">Instructions</a> page) and generate correct solution, incorrect solution
+                and the list of PLC tags (for sequences that are inputted in the sequence field) that can be imported in
+                the TIA Portal. You can define your own PLC tags by creating a sequence in the Project tab and assigning
+                corresponding components to it.</p>
+            <p>To generate the sequence, please provide it in the Sequence field, select the complexity of errors
+                (either None (for no errors to be generated), Easy, Medium or Hard) and press <i>GENERATE CODE</i> button. If you
+                selected complexity of Errors to generate, the tool will display the incorrect code. You will be able to
+                see the correct code by pressing the <i>SHOW SOLUTION</i> button.</p>
+
+            <p>All of the code snippets generated (correct, incorrect and XML Tags) can be copied to clipboard by pressing the corresponding <i>Copy to clipboard</i> button.</p><br>
             <form class="form-signin text-center">
                 <label for="sequence" class="sr-only">Sequence:</label>
                 <input type="text" id="sequence" class="form-control margin-b-2" placeholder="Sequence">

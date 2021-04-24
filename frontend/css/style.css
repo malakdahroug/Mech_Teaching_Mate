@@ -172,18 +172,19 @@ footer {
     box-shadow: 0 0 5px 2px #555;
 }
 
-.text-center img {
+.text-center2 img {
     box-shadow: 0 0 5px 2px #555;
     border-radius: 25%;
 }
 
-.text-center {
+.text-center2 {
     text-align: center;
 }
 
 .contact {
     font-weight: bold;
     letter-spacing: 2px;
+    text-align: center;
 }
 
 .other-content p {
@@ -191,6 +192,11 @@ footer {
     text-align: justify;
     font-size: 1.15rem;
     line-height: 1.75rem;
+}
+
+.logo {
+    box-shadow: 0 0 5px 2px #555;
+    border-radius: 50%;
 }
 
 @media (max-width: 767px) {
