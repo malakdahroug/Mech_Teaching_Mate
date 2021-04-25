@@ -144,6 +144,11 @@ Not available yet.
 
 Double sequence validation <sup>1</sup> - it was identified the sequence validation requires more than regular expression validation only. As a result validation is only done in the backend to keep frontend logics simple.
 ## Changelog frontend
+### Version 1.0.2
+- Finalised the frontend design
+- Added Simulated PLC page
+- Added instructions on each of the pages
+
 ### Version 1.0.1
 - Developed user-friendly, responsive frontend base
 - Added various parts for the frontend including:
@@ -156,6 +161,56 @@ Double sequence validation <sup>1</sup> - it was identified the sequence validat
 - Added simple frontend to test the backend routes
 
 ## Changelog backend
+### Version 7.0.2
+- Bug fixes
+- Added checks to detect sequences that start with extended actuators
+- Added new error message for sequences that start with extended actuators
+
+### Version 7.0.1
+- Implemented more advanced options in error generator
+
+### Version 7.0.0
+- Implemented error generation by reusing previous error generator logics
+
+---
+
+### Version 6.0.3
+- Implemented support for using predefined tag names for sequence components
+
+### Version 6.0.2
+- Implemented an option to generate XML file that can be imported to TIA Portal (for auto-generated tag names)
+
+### Version 6.0.1
+- Implemented support for nested repetitive sequences (single depth of nesting, sequences must start and with square brackets)
+
+### Version 6.0.0
+- Implemented support for combined sequences (repetitive, concurrent and timed)
+
+---
+
+### Version 5.0.0
+- Implemented an option to generate code for sequences that contain timers
+- Manually tested timed sequence generation
+
+---
+
+### Version 4.0.0
+- Implemented an option to generate code for sequences that contain repetitive parts (no nesting)
+- Manually tested repetitive sequence generation
+
+---
+
+### Version 3.0.0
+- Implemented an option to generate code for sequences that contain concurrent parts
+- Manually tested concurrent sequence generation
+
+---
+
+### Version 2.0.3
+- Added an option to configure project components
+- Added project management options
+- Added an option to delete project components
+
 ### Version 2.0.2
 - Defined Schemas for Projects and ProjectConfigs to be stored in MongoDB
 - Added backend GET route to fulfill project creation functionality
@@ -165,6 +220,8 @@ Double sequence validation <sup>1</sup> - it was identified the sequence validat
 - Added database connections
 - Defined Schema for User objects to be stored in MongoDB  
 - Fulfilled login and registration functionalities through POST backend routes
+
+---
 
 ### Version 2.0.0
 - Added simple login / registration system using local array
@@ -209,3 +266,42 @@ to be processed left to right.
 and splits it using commas.
 - Added PROOF OF CONCEPT generateCode function that takes an array of operations and generates the mockup of the future
 code. It is capable of validating a serial sequence of cylinder actions (retractions and extensions).
+
+## Changelog communication stack
+### Version 2.0.3
+- Bug fixes
+- Added checks to prevent sequences starting with extended actuators from executing
+
+### Version 2.0.2
+- Implemented set of routes to interact with the PLC from the frontend including:
+    - Get list of available PLCs
+    - Stop sequence execution
+    - Start sequence execution
+
+### Version 2.0.1
+- Implemented set of checks to ensure that PLC that executes a sequence cannot be connected to
+- Implemented stopping mechanism for a PLC that is currently executing a sequence
+
+### Version 2.0.0
+- Added an option to connect to various PLCs
+
+---
+
+### Version 1.0.5
+- Bug fixes for combined sequences
+
+### Version 1.0.4
+- Implemented repetitive sequence support
+
+### Version 1.0.3
+- Implemented concurrent sequence support
+
+### Version 1.0.2
+- Implemented timed sequence support
+
+### Version 1.0.1
+- Implemented logics to execute simple sequences (without counters, timers and concurrent executions)
+
+### Version 1.0.0
+- Investigated connectivity options for communication stack
+- Implemented simple proof of concept connector to connect to OPC UA server of the PLC
