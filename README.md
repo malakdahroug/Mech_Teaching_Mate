@@ -9,6 +9,19 @@ To run the code on your device you have to have the following tools installed:
 If all the dependencies are installed, run the following in the terminal / command line:  
 `git clone malakdahroug/Mech_Teaching_Mate`  
 `cd repository_location`  
+`npm install`
+
+#### Frontend
+`cd frontend`  
+`node index.js`  
+
+#### Backend
+`cd backend`  
+`npm install`  
+`node start.js`  
+
+#### Communication stack
+`cd commstack`  
 `npm install`  
 `node index.js`
 
