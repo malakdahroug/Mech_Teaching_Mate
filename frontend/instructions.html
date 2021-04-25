@@ -19,7 +19,7 @@
     <div class="row bg-light pad1">
         <div class="col-lg">
             <h2 class="page-title">Instructions</h2>
-            <p>This page contain all instructions on how to prepare the sequence for the generation. The sequence has to be satisfying set of rules otherwise the Generator, Validator or Simulated PLC might
+            <p>This page contains all instructions on how to prepare a sequence for the system. The sequence has to be satisfying a set of rules otherwise the Generator, Validator or Simulated PLC might
             return errors.</p>
             <h4>Sequence description</h4>
             <ul>
@@ -34,11 +34,10 @@
                 </li>
                 <li>Sequence can contain repetitive parts indicated with square brackets e.g. [ SEQUENCE TO REPEAT ]^x - where X is an integer number greater than or equal to 2</li>
                 <li>Sequence can contain concurrent parts indicated with round brackets e.g. (concurrent actuations)</li>
-                <li><b>Sequence can only start with all cylinders retracted</b></li>
+                <li><b>Sequence can only start with all actuators retracted</b></li>
             </ul>
             <h5>Example of valid sequences</h5>
-            <p>The sequences listed below will get correctly verified by the Mechatronics Teaching Mate. Code and errors currently can be generated only for the simple sequences - the ones that do
-            not include timers, repetitive and concurrent parts.</p>
+            <p>The sequences listed below will get correctly verified by the Mechatronics Teaching Mate.</p>
             <ul>
                 <li>A+,A-,B+,B-</li>
                 <li>C+,B+,TS,A+,B-,C-,A-</li>
@@ -53,7 +52,7 @@
             </ul>
             <br>
             <h5>Examples of invalid sequences</h5>
-            <p>The sequences listed below won't be successfully validated using Mechatronics Teaching Mate validator. Also, the code for the given sequences won't get generated.</p>
+            <p>The sequences listed below won't be successfully validated using the Mechatronics Teaching Mate validator.</p>
             <ul>
                 <li>A+A-B+B-</li>
                 <li>C+,B+,s,A+,B-,C-,A-</li>
