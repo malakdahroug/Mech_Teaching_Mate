@@ -31,9 +31,25 @@
 
             <p>If no PLCs ara
                 available, they can be stopped by selecting the PLC from the list of unavailable PLCs and pressing the
-                <i>STOP EXECUTION</i> button. Before doing that, make sure no one else is currently trying to observe the
+                <i>STOP EXECUTION</i> button. Before doing that, make sure no one else is currently trying to observe
+                the
                 sequence simulation using the selected PLC.</p>
-            <p><b>Currently, the simulated PLC is only capable of executing sequences with all actuators starting in their retracted positions.</b><br>
+            <p><b>Currently, the simulated PLC is only capable of executing sequences with all actuators starting in
+                their retracted positions. Additionally, the simulated PLC only supports a maximum of one level of
+                nested
+                repeating sequences - only for sequences that start and end with square brackets. Nested sequences that are supported must be repeating infinitely (without a number of repetitions specified at the end).
+            </b></p>
+            <b>Correct sequences:</b>
+            <ul>
+                <li>[A+,[B+,B-]^3,[A-,A+]^3,A-]</li>
+                <li>[A+,[B+,B-]^3,A-]</li>
+            </ul>
+            <b>Incorrect sequences:</b>
+            <ul>
+                <li>[A+,[B+,B-,[A-,A+]^2]^3,[A-,A+]^3,A-]</li>
+                <li>A+,A-,[A+,[B+,B-]^3,A-]</li>
+            </ul>
+            <br>
             <form class="form-signin text-center">
                 <label for="sequence" class="sr-only">Sequence:</label>
                 <input type="text" id="sequence" class="form-control margin-b-2" placeholder="Sequence">
