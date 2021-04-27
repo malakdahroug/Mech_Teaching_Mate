@@ -127,7 +127,7 @@ Current Version 2.0.3
     - Investigate requirements of the PLC comm stack.
     - OPTIONAL: Implement a tailored comm stack if it can address issues discovered in the existing Communication Stack - Stage 1 (if there should be any).
 
-Double sequence validation (validation occuring in both the backend and the frontend) <sup>1</sup> - it was identified that the sequence validation requires more than the regular expression validation alone. As a result validation is only done in the backend to keep the frontend logics simple.
+Double sequence validation (validation occurring in both the backend and the frontend) <sup>1</sup> - it was identified that the sequence validation requires more than the regular expression validation alone. As a result validation is only done in the backend to keep the frontend logics simple.
 ## Changelog frontend
 ### Version 1.0.2
 - Finalised the frontend design.
@@ -178,7 +178,7 @@ Double sequence validation (validation occuring in both the backend and the fron
 
 ### Version 5.0.0
 - Implemented an option to generate code for sequences that contain repetitive parts (no nesting).
-- Manually tested the genration of repetitive sequences.
+- Manually tested the generation of repetitive sequences.
 
 ---
 
