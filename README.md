@@ -162,7 +162,7 @@ Double sequence validation (validation occurring in both the backend and the fro
 - removing one of the conditions within an IF statement
 
 ### Version 7.0.0
-- Implemented error generation by reusing the previous error generator logics.
+- further developed the error generator and re-used the previous error generator logics.
 
 ---
 
