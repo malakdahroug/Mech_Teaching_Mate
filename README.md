@@ -265,7 +265,7 @@ code. It is capable of validating a serial sequence of actuator actions (retract
 - Added checks to prevent sequences starting with extended actuators from executing.
 
 ### Version 2.0.2
-- Implemented a set of routes to interact with the PLC from the frontend. the lsit includes:
+- Implemented a set of routes to interact with the PLC from the frontend. the list includes:
     - Get list of available PLCs
     - Stop sequence execution
     - Start sequence execution
