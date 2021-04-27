@@ -183,18 +183,18 @@ Double sequence validation (validation occurring in both the backend and the fro
 
 ### Version 5.0.0
 - Implemented an option to generate code for sequences that contain repetitive parts (no nesting).
-- Manually tested the generation of repetitive sequences.
+- Manually tested the code generation of repetitive sequences.
 
 ---
 
 ### Version 4.0.0
 - Implemented an option to generate code for sequences that contain timers.
-- Manually tested the generation of timed sequences.
+- Manually tested the code generation of timed sequences.
 ---
 
 ### Version 3.0.0
 - Implemented an option to generate code for sequences that contain concurrent parts.
-- Manually tested the generation of concurrent sequences. 
+- Manually tested the code generation of concurrent sequences. 
 
 ---
 
