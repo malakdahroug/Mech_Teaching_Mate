@@ -134,6 +134,11 @@ Double sequence validation (validation occurring in both the backend and the fro
 - Added Simulated PLC page.
 - Added instructions on each of the pages.
 
+### Version 1.0.1b
+- Implemnted a feature that allows users to configure their projects.
+- Added a set of functions that extract the list of components from a given automation sequence and provides the user with the ability to configure their PLC tags. 
+
+
 ### Version 1.0.1
 - Developed a user-friendly, responsive frontend base.
 - Added various aspects of the frontend including:
