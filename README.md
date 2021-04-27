@@ -153,8 +153,8 @@ Double sequence validation (validation occurring in both the backend and the fro
 ## Changelog backend
 ### Version 7.0.2
 - Fixed bugs found.
-- Added checks to detect sequences that start with extended actuators.
-- Added a new error message for sequences that start with extended actuators.
+- Added checks within the system to detect sequences that start with extended actuators.
+- Added the ability for the system to send an error message to users that input sequences that start with extended actuators.
 
 ### Version 7.0.1
 - Implemented more advanced options in the error generator such as:
