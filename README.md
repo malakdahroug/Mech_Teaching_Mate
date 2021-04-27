@@ -173,7 +173,7 @@ Double sequence validation (validation occurring in both the backend and the fro
 - Implemented an option for the user to generate an XML file for auto-generated tag names that can be imported to TIA Portal.
 
 ### Version 6.0.1
-- Implemented the ability for the system to support nested repetitive sequences (single depth of nesting sequences must start and end with square brackets).
+- Implemented the ability for the system to support single levelled nested repetitive sequences (these nested sequences must be infinitely repeating and must not include any actuations that occur before them.)
 - example: [A+,A-[B+,B-]^2]
 
 ### Version 6.0.0
