@@ -39,7 +39,7 @@ console.log('Started');
 // - state(boolean) - current state of the PLC availability, if true then PLC can be connected to
 // - stopSignal(boolean) - was stopSignal issued? if set to true, PLC will be attempted to be stopped at next possible opportunity in the code execution
 let plcList = [
-    {name: 'PLC_5', ip: '192.168.0.42', state: true, stopSignal: false, currentUser: ''}
+    {name: 'PLC_5', ip: '192.168.1.10', state: true, stopSignal: false, currentUser: ''}
 ];
 
 /**

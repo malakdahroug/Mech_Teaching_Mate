@@ -177,15 +177,14 @@ Double sequence validation (validation occuring in both the backend and the fron
 ---
 
 ### Version 5.0.0
-- Implemented an option to generate code for sequences that contain timers.
-- Manually tested the generation of timed sequences. 
+- Implemented an option to generate code for sequences that contain repetitive parts (no nesting).
+- Manually tested the genration of repetitive sequences.
 
 ---
 
 ### Version 4.0.0
-- Implemented an option to generate code for sequences that contain repetitive parts (no nesting).
-- Manually tested the genration of repetitive sequences.
-
+- Implemented an option to generate code for sequences that contain timers.
+- Manually tested the generation of timed sequences.
 ---
 
 ### Version 3.0.0
@@ -276,7 +275,7 @@ code. It is capable of validating a serial sequence of actuator actions (retract
 ---
 
 ### Version 1.0.5
-- fixed bugs found. 
+- Fixed bugs found. 
 
 ### Version 1.0.4
 - Implemented the ability for the Simulated PLC' to support repetitive sequences.
