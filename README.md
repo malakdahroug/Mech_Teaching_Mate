@@ -135,7 +135,7 @@ Double sequence validation (validation occurring in both the backend and the fro
 - Added instructions on each of the pages.
 
 ### Version 1.0.1b
-- Implemnted a feature that allows users to configure their projects.
+- Implemented a feature that allows users to configure their projects.
 - Added a set of functions that extract the list of components from a given automation sequence and provides the user with the ability to configure their PLC tags. 
 
 
