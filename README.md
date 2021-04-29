@@ -153,8 +153,8 @@ Double sequence validation (validation occurring in both the backend and the fro
 ## Changelog backend
 ### Version 7.0.2
 - Fixed bugs found.
-- Added checks to detect sequences that start with extended actuators.
-- Added a new error message for sequences that start with extended actuators.
+- Added checks within the system to detect sequences that start with extended actuators.
+- Added the ability for the system to send an error message to users that input sequences that start with extended actuators.
 
 ### Version 7.0.1
 - Implemented more advanced options in the error generator such as:
@@ -162,7 +162,7 @@ Double sequence validation (validation occurring in both the backend and the fro
 - removing one of the conditions within an IF statement
 
 ### Version 7.0.0
-- Implemented error generation by reusing the previous error generator logics.
+- further developed the error generator and re-used the previous error generator logics.
 
 ---
 
@@ -173,7 +173,7 @@ Double sequence validation (validation occurring in both the backend and the fro
 - Implemented an option for the user to generate an XML file for auto-generated tag names that can be imported to TIA Portal.
 
 ### Version 6.0.1
-- Implemented the ability for the system to support nested repetitive sequences (single depth of nesting sequences must start and end with square brackets).
+- Implemented the ability for the system to support single levelled nested repetitive sequences (these nested sequences must be infinitely repeating and must not include any actuations that occur before them.)
 - example: [A+,A-[B+,B-]^2]
 
 ### Version 6.0.0
@@ -183,18 +183,18 @@ Double sequence validation (validation occurring in both the backend and the fro
 
 ### Version 5.0.0
 - Implemented an option to generate code for sequences that contain repetitive parts (no nesting).
-- Manually tested the generation of repetitive sequences.
+- Manually tested the code generation of repetitive sequences.
 
 ---
 
 ### Version 4.0.0
 - Implemented an option to generate code for sequences that contain timers.
-- Manually tested the generation of timed sequences.
+- Manually tested the code generation of timed sequences.
 ---
 
 ### Version 3.0.0
 - Implemented an option to generate code for sequences that contain concurrent parts.
-- Manually tested the generation of concurrent sequences. 
+- Manually tested the code generation of concurrent sequences. 
 
 ---
 
@@ -265,7 +265,7 @@ code. It is capable of validating a serial sequence of actuator actions (retract
 - Added checks to prevent sequences starting with extended actuators from executing.
 
 ### Version 2.0.2
-- Implemented a set of routes to interact with the PLC from the frontend. the lsit includes:
+- Implemented a set of routes to interact with the PLC from the frontend. the list includes:
     - Get list of available PLCs
     - Stop sequence execution
     - Start sequence execution
